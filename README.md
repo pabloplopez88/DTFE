@@ -15,6 +15,27 @@ The code comes with a complete [documentation](documentation/DTFE_user_guide.pdf
 The public release of the code is summarised in the arxiv publication [Cautun et al. (2011)](https://ui.adsabs.harvard.edu/abs/2011arXiv1105.0370C/abstract) and it is based on the method paper [Schaap and van de Weygaert (2000)](https://ui.adsabs.harvard.edu/abs/2000A%26A...363L..29S/abstract).
 
 
+## Compiling
+
+The easiest way to compile the code on any Linux computer or cluster is with [conda](https://docs.conda.io/en/latest/miniconda.html), which installs the compiler and all the required libraries (GSL, Boost, CGAL, GMP, MPFR and HDF5) in your home directory, without needing administrator rights or cluster modules:
+
+```bash
+git clone git@github.com:pabloplopez88/DTFE.git
+cd DTFE
+conda env create -f environment.yml   # only the first time on each computer
+conda activate dtfe
+make
+```
+
+This produces the `DTFE` executable. The library paths are stored inside the executable, so it runs without setting `LD_LIBRARY_PATH` (you do not even need to activate the conda environment to run it, e.g. inside a SLURM job).
+
+Notes:
+* Compile-time options (number of dimensions, velocity/scalar fields, default input/output formats, etc.) are set at the top of the `Makefile`.
+* Support for HDF5 snapshots is enabled automatically when the HDF5 C++ library is found. Use `make USE_HDF5=no` to disable it.
+* To use libraries installed elsewhere instead of conda (e.g. cluster modules), give their location: `make LIB_PREFIX=/path/to/prefix`, or each one separately with `GSL_PATH`, `BOOST_PATH`, `CGAL_PATH`, `MPRF_PATH` (GMP and MPFR) and `HDF5_PATH`. The compiler can be chosen with `make CXX=g++`.
+* Tested with CGAL 5.6 and 6.2, Boost 1.83 and 1.92, HDF5 1.10 and 2.2, and GCC 13.
+
+
 ## The DTFE method
 The Delaunay Tessellation Field Interpolation (DTFE) method represents the natural way of going from discrete samples/measurements to values on a periodic grid and it is especially suitable for astronomical data due to the following reasons:
 * Preserves the multi-scale character of the point distribution. This is the case in numerical simulations of large scale structure where the density varies over more than 6 orders of magnitude.

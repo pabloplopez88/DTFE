@@ -1,14 +1,31 @@
 # Makefile for compiling the DTFE code on Linux systems
+#
+# QUICK START (any cluster/computer, see README.md):
+#     conda env create -f environment.yml    # only the first time
+#     conda activate dtfe
+#     make
+#
+# By default all the libraries (GSL, Boost, CGAL, GMP, MPFR and HDF5) and the C++ compiler are taken from
+# the active conda environment, so you do not need to edit any path in this file.
 
 
-# Path to the GSL, Boost C++ and CGAL libraries - must be set by user (only if they aren't installed in the default system path) -- (NOTE: You must add only the directory where the libraries are installed, the program will add the '/lib' and '/include' parts automatically); C++ compiler - preferably a version that supports OpenMP
-GSL_PATH   = /cosma/local/gsl/2.4
-BOOST_PATH = /cosma/local/boost/gnu_7.3.0/1_67_0
-CGAL_PATH  = /cosma/home/dphlss/cautun/Programs/stow
-MPRF_PATH  = /cosma/home/dphlss/cautun/Programs/stow
-CC = g++
-# set the following if you have installed the HDF5 library and would like to read in HDF5 gadget files (you need to compile the HDF5 library with the '--enable-cxx' configure option)
-HDF5_PATH  = /cosma/local/hdf5/gnu_7.3.0/1.10.3
+# Directory where the libraries are installed (the program adds the '/lib' and '/include' parts automatically).
+# Default: the active conda environment. If you want to use libraries installed somewhere else, set LIB_PREFIX
+# (one directory for all the libraries) or the individual paths below, e.g.:  make BOOST_PATH=/opt/boost
+LIB_PREFIX ?= $(CONDA_PREFIX)
+GSL_PATH   ?= $(LIB_PREFIX)
+BOOST_PATH ?= $(LIB_PREFIX)
+CGAL_PATH  ?= $(LIB_PREFIX)
+# path to the GMP and MPFR libraries (needed by CGAL)
+MPRF_PATH  ?= $(LIB_PREFIX)
+# path to the HDF5 library (it must include the C++ interface, i.e. 'H5Cpp.h' and 'libhdf5_cpp')
+HDF5_PATH  ?= $(LIB_PREFIX)
+# support for reading HDF5 gadget files: 'auto' (enabled if the HDF5 C++ library is found), 'yes' or 'no'
+USE_HDF5   ?= auto
+
+# C++ compiler - preferably a version that supports OpenMP. Inside a conda environment with the 'cxx-compiler'
+# package, the variable CXX already points to the conda compiler; otherwise 'g++' is used.
+CC = $(CXX)
 
 
 # paths to where to put the object files and the executables files. If you build the DTFE library than you also need to specify the directory where to put the library and the directory where to copy the header files needed by the library (choose an empty directory for the header files).
@@ -80,33 +97,26 @@ OPTIONS += -DADDITIONAL_OPTIONS
 ###############  DO NOT MODIFY BELOW THIS LINE  ###########################
 # do not modify below this line
 SRC = ./src
-INCLUDES = 
-LIBRARIES = 
 
-ifneq ($(strip $(GSL_PATH)),)
-	INCLUDES += -I/$(strip $(GSL_PATH))/include 
-	LIBRARIES += -L/$(strip $(GSL_PATH))/lib 
+# list of the library directories given by the user (duplicates removed)
+LIB_DIRS := $(sort $(strip $(GSL_PATH) $(BOOST_PATH) $(CGAL_PATH) $(MPRF_PATH)))
+ifeq ($(USE_HDF5),auto)
+	USE_HDF5 := $(if $(wildcard $(strip $(HDF5_PATH))/include/H5Cpp.h),yes,no)
 endif
-ifneq ($(strip $(BOOST_PATH)),)
-	INCLUDES += -I/$(strip $(BOOST_PATH))/include 
-	LIBRARIES += -L/$(strip $(BOOST_PATH))/lib 
-endif
-ifneq ($(strip $(CGAL_PATH)),)
-	INCLUDES += -I/$(strip $(CGAL_PATH))/include 
-	LIBRARIES += -L/$(strip $(CGAL_PATH))/lib 
-endif
-ifneq ($(strip $(HDF5_PATH)),)
-	INCLUDES += -I/$(strip $(HDF5_PATH))/include 
-	LIBRARIES += -L/$(strip $(HDF5_PATH))/lib -lhdf5 -lhdf5_cpp
+ifeq ($(USE_HDF5),yes)
+	LIB_DIRS := $(sort $(LIB_DIRS) $(strip $(HDF5_PATH)))
 	OPTIONS += -DHDF5
+	HDF5_LIB = -lhdf5_cpp -lhdf5
 endif
 
-
+INCLUDES  = $(foreach dir,$(LIB_DIRS),-I$(dir)/include)
+# '-rpath' stores the library paths in the executable, so it runs without having to set LD_LIBRARY_PATH
+LIBRARIES = $(foreach dir,$(LIB_DIRS),-L$(dir)/lib -Wl,-rpath,$(dir)/lib)
 
 COMPILE_FLAGS = -frounding-math -O3 -fopenmp -DNDEBUG $(OPTIONS)
 DTFE_INC = $(INCLUDES)
-# the following libraries should work in most cases
-DTFE_LIB = $(LIBRARIES) -lCGAL -lboost_thread -lboost_filesystem -lboost_program_options -lgsl -lgslcblas -lm  -lgmp -lmpfr -lboost_system
+# the following libraries should work in most cases (CGAL >= 5 is header-only, so there is no '-lCGAL')
+DTFE_LIB = $(LIBRARIES) $(HDF5_LIB) -lboost_filesystem -lboost_program_options -lgsl -lgslcblas -lmpfr -lgmp -lm
 
 
 

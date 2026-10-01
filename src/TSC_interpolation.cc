@@ -72,7 +72,7 @@ void TSC_interpolation_regular_grid(vector<Particle_data> &particles,
     MESSAGE::Message message( userOptions.verboseLevel );
     message << "\nInterpolating the fields to the grid using the TSC method. The interpolation takes place inside the box of coordinates " << userOptions.region.print()
             << " on a " << MESSAGE::printElements( nGrid, NO_DIM, "*" ) << " grid ... " << MESSAGE::Flush;
-    boost::timer t;
+    CPU_timer t;
     t.restart();
     
     

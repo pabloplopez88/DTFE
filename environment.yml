@@ -1,0 +1,19 @@
+# Conda environment with everything needed to compile DTFE (compiler + libraries).
+# Usage (only the first time on each computer/cluster):
+#     conda env create -f environment.yml
+#     conda activate dtfe
+#     make
+# To update the environment after changing this file:
+#     conda env update -f environment.yml --prune
+name: dtfe
+channels:
+  - conda-forge
+dependencies:
+  - cxx-compiler        # C++ compiler (gcc) with OpenMP support
+  - make
+  - gsl
+  - libboost-devel      # Boost (filesystem, program_options and header-only parts)
+  - cgal-cpp            # CGAL (header-only since version 5)
+  - gmp                 # needed by CGAL
+  - mpfr                # needed by CGAL
+  - hdf5                # includes the C++ interface (H5Cpp.h, libhdf5_cpp) used to read HDF5 snapshots

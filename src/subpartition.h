@@ -50,7 +50,18 @@ This header contains functions that will select the particles inside a sub-box o
 #include "miscellaneous.h"
 #include "message.h"
 
-#include <boost/timer.hpp>
+#include <ctime>
+
+/* Simple CPU timer (drop-in replacement for the deprecated 'CPU_timer', which was removed from recent Boost versions). Measures CPU time, like the original. */
+class CPU_timer
+{
+public:
+    CPU_timer() : _start( std::clock() ) {}
+    void restart() { _start = std::clock(); }
+    double elapsed() const { return double(std::clock() - _start) / CLOCKS_PER_SEC; }
+private:
+    std::clock_t _start;
+};
 
 typedef std::vector<Particle_data>::iterator   vectorIterator;
 
@@ -64,7 +75,7 @@ void insertParticlesInBox(std::vector<Particle_data> &p,
 
 
 /* Prints the elapsed time and updates the 'totalTime' variable in User_options class. */
-void printElapsedTime(boost::timer *t, User_options *userOptions,
+void printElapsedTime(CPU_timer *t, User_options *userOptions,
                       std::string computationQuantityName)
 {
     userOptions->totalTime += t->elapsed();

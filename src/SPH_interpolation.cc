@@ -267,7 +267,7 @@ void SPH_interpolation(vector<Particle_data> &p,
     
     // first construct the kdtree
     message << "Computing the kdtree for the SPH interpolation ... " << MESSAGE::Flush;
-    boost::timer t;
+    CPU_timer t;
     t.restart();
     size_t const noParticles = p.size();
     kdtree2_array dataPoints(extents[noParticles][NO_DIM]);
@@ -517,7 +517,7 @@ void SPH_interpolation(vector<Particle_data> &p,
 //     
 //     
 //     message << "\nComputing the smoothing scale and density at each particle position.\n\tDone:  " << MESSAGE::Flush;
-//     boost::timer t;
+//     CPU_timer t;
 //     t.restart();
 //     // find the smoothing length and SPH density associated to each particle
 //     kdtree2_result_vector result;   //stores the result of the nearest neighbors

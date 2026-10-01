@@ -54,3 +54,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# DTFE library headers (make library)
+DTFE_include/
+
+# Jupyter / editor leftovers
+.ipynb_checkpoints/
+*~
