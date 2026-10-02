@@ -92,25 +92,22 @@ void initializeGadget(std::string filename,
     int offset = (*gadgetFileType)==2 ? 16 : 0;      // keep track if file type 2 to have a 16 bytes offset every time reading a new data block
 
 
-    // now read the actual values of the gadget header
+    // now read the actual values of the gadget header (it tries first the Gadget-1/2 header and then the Gadget-4 one)
     inputFile.seekg( offset, std::ios::beg );
-    inputFile.read( reinterpret_cast<char *>(&buffer1), sizeof(buffer1) );
-    inputFile.read( reinterpret_cast<char *>(gadgetHeader), sizeof(*gadgetHeader) );
-    inputFile.read( reinterpret_cast<char *>(&buffer2), sizeof(buffer2) );
-    SWAP_HEADER_ENDIANNESS( *swapEndian, buffer1, buffer2, (*gadgetHeader) ); //swap endianness if that is the case  
+    int headerType = gadgetHeader->readHeaderBlock( inputFile, *swapEndian, fileName );
+    if ( headerType==4 )
+        message << "Detected a GADGET-4 snapshot header (Gadget-4 binary snapshot written without the GADGET2_HEADER option).\n" << MESSAGE::Flush;
     
     // get the type (float/double) used to store position and velocity data
     inputFile.seekg( offset, std::ios::cur );
     inputFile.read( reinterpret_cast<char *>(&buffer3), sizeof(buffer3) );
+    if ( *swapEndian ) BYTESWAP( buffer3 );
     inputFile.seekg( buffer3, std::ios::cur );
     inputFile.seekg( offset, std::ios::cur );
     inputFile.read( reinterpret_cast<char *>(&buffer4), sizeof(buffer4) );
     inputFile.read( reinterpret_cast<char *>(&buffer4), sizeof(buffer4) );
+    if ( *swapEndian ) BYTESWAP( buffer4 );
     inputFile.close();
-    
-    SWAP_HEADER_ENDIANNESS( *swapEndian, buffer1, buffer2, (*gadgetHeader) ); //swap endianness if that is the case
-    if ( buffer1!=buffer2 or buffer1!=256 )
-        throwError( "The was an error while reading the header of the GADGET snapshot file. The integers before and after the header do not match the value 256. The GADGET snapshot file is corrupt." );
     
     // compute the number of bytes used to save each real value
     int thisNoParts = 0;
@@ -276,16 +273,10 @@ void countGadgetParticleNumber(std::string filenameRoot,
         std::fstream inputFile;
         openInputBinaryFile( inputFile, fileName );
 
-        // read the header
-        int buffer1, buffer2;
+        // read the header (Gadget-1/2 or Gadget-4)
         inputFile.seekg( offset, std::ios::beg );
-        inputFile.read( reinterpret_cast<char *>(&buffer1), sizeof(buffer1) );
-        inputFile.read( reinterpret_cast<char *>(&gadgetHeader), sizeof(gadgetHeader) );
-        inputFile.read( reinterpret_cast<char *>(&buffer2), sizeof(buffer2) );
+        gadgetHeader.readHeaderBlock( inputFile, swapEndian, fileName );
         inputFile.close();
-        SWAP_HEADER_ENDIANNESS( swapEndian, buffer1, buffer2, gadgetHeader ); //swap endianness if that is the case
-        if ( buffer1!=buffer2 or buffer1!=256 )
-            throwError( "The was an error while reading the header of the GADGET snapshot file '" + fileName + "'. The integers before and after the header do not match the value 256. The GADGET snapshot file is corrupt." );
 
         // add the particle numbers
         for (int j=0; j<6; ++j)
@@ -318,14 +309,11 @@ void readGadgetData(std::string fileName,
     openInputBinaryFile( inputFile, fileName );
 
 
-    // read the header
+    // read the header (Gadget-1/2 or Gadget-4)
     int buffer1, buffer2;
     Gadget_header tempHeader;
-    READ_DELIMETER;
-    inputFile.read( reinterpret_cast<char *>(&tempHeader), sizeof(tempHeader) );
-    DELIMETER_CONSISTANCY_CHECK("header");
-    if ( buffer1!=256 )
-        throwError( "The integers before and after the header do not match the value 256. The GADGET snapshot file is corrupt." );
+    inputFile.seekg( offset, std::ios::cur );
+    tempHeader.readHeaderBlock( inputFile, swapEndian, fileName );
 
 
     // read the position block

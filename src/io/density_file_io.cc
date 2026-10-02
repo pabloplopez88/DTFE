@@ -223,9 +223,9 @@ struct Density_header
             bool validFile = gadgetHeader.detectSnapshotType( buffer, &gadgetFileType, &swapEndian );
             if ( not validFile )
                 return;
-            int offset = gadgetFileType==2 ? 16+sizeof(buffer) : 0+sizeof(buffer);
+            int offset = gadgetFileType==2 ? 16 : 0;
             inputFile.seekg( offset, std::ios::beg );
-            inputFile.read( reinterpret_cast<char *>(&gadgetHeader), sizeof(gadgetHeader) );
+            gadgetHeader.readHeaderBlock( inputFile, swapEndian, filename );   // Gadget-1/2 or Gadget-4 header
             inputFile.close();
         }
 #ifdef HDF5

@@ -35,6 +35,7 @@ Notes:
 * Support for HDF5 snapshots is enabled automatically when the HDF5 C++ library is found. Use `make USE_HDF5=no` to disable it.
 * To use libraries installed elsewhere instead of conda (e.g. cluster modules), give their location: `make LIB_PREFIX=/path/to/prefix`, or each one separately with `GSL_PATH`, `BOOST_PATH`, `CGAL_PATH`, `MPRF_PATH` (GMP and MPFR) and `HDF5_PATH`. The compiler can be chosen with `make CXX=g++`.
 * On clusters, do not mix cluster modules with the conda environment: run `module purge` before `conda activate dtfe` and `make` (a loaded `gcc` module can make the conda compiler fail with `cannot execute 'cc1plus'`). Also use `module purge` in SLURM job scripts before running `DTFE`.
+* Gadget binary snapshots (`--input 101` or `102`, formats 1 and 2) are read with either the Gadget-1/2 header or the Gadget-4 header (the default of Gadget-4 when it is compiled without `GADGET2_HEADER`): the program tries the Gadget-2 header first, then the Gadget-4 one, and stops with an error only if none matches. Positions and velocities can be in single or double precision, and files with the opposite endianness are also supported. Gadget HDF5 snapshots (`--input 105`) are read from both Gadget-2/3 and Gadget-4.
 * Tested with CGAL 5.6 and 6.2, Boost 1.83, 1.90 and 1.92, HDF5 1.10 and 2.2, and GCC 13 and 15.
 
 
