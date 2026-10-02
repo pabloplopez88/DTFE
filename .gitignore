@@ -64,3 +64,4 @@ DTFE_include/
 
 # output of the demo run
 demo/demo_output*
+demo/demo_density.png

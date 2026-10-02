@@ -34,7 +34,7 @@ def main():
     parser.add_argument("file", nargs="?", default="demo/demo_output.den", help="DTFE density file [demo/demo_output.den]")
     parser.add_argument("--box", type=float, default=50.0, help="box side length in Mpc [50]")
     parser.add_argument("--halfwidth", type=int, default=None, help="slab half-width D in cells [ngrid/16]")
-    parser.add_argument("--out", default=None, help="save the figure to this file (e.g. plot.png)")
+    parser.add_argument("--out", default="demo/demo_density.png", help="save the figure to this file [demo/demo_density.png]")
     args, _ = parser.parse_known_args()   # 'known' so that it also works inside Jupyter
 
     rho = read_density(args.file)
