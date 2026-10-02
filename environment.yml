@@ -3,7 +3,7 @@
 #     conda env create -f environment.yml
 #     conda activate dtfe
 #     make
-# To update the environment after changing this file:
+# To update an existing environment after changing this file:
 #     conda env update -f environment.yml --prune
 name: dtfe
 channels:
@@ -17,3 +17,6 @@ dependencies:
   - gmp                 # needed by CGAL
   - mpfr                # needed by CGAL
   - hdf5                # includes the C++ interface (H5Cpp.h, libhdf5_cpp) used to read HDF5 snapshots
+  # only needed for demo/plot_density.py
+  - numpy
+  - matplotlib-base

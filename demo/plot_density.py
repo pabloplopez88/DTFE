@@ -63,7 +63,8 @@ def main():
     if args.out:
         fig.savefig(args.out, dpi=150)
         print(f"Figure saved to '{args.out}'")
-    plt.show()
+    if plt.get_backend().lower() != "agg":   # show the figure only if there is a display (e.g. not on a cluster terminal)
+        plt.show()
 
 
 if __name__ == "__main__":

@@ -20,8 +20,9 @@ The public release of the code is summarised in the arxiv publication [Cautun et
 The easiest way to compile the code on any Linux computer or cluster is with [conda](https://docs.conda.io/en/latest/miniconda.html), which installs the compiler and all the required libraries (GSL, Boost, CGAL, GMP, MPFR and HDF5) in your home directory, without needing administrator rights or cluster modules:
 
 ```bash
-git clone git@github.com:pabloplopez88/DTFE.git
+git clone https://github.com/pabloplopez88/DTFE.git
 cd DTFE
+module purge                          # only on clusters with environment modules (see notes below)
 conda env create -f environment.yml   # only the first time on each computer
 conda activate dtfe
 make
@@ -54,7 +55,13 @@ rho = np.fromfile('demo/demo_output.den', dtype=np.float32).reshape(n, n, n)
 delta = rho / rho.mean()      # density in units of the mean density
 ```
 
-To make a quick figure of the result (a slab through the middle of the box and a projection along the full box), run `python demo/plot_density.py` (or `%run demo/plot_density.py` in a Jupyter notebook). Use `python demo/plot_density.py --help` for the options.
+To make a quick figure of the result (a slab through the middle of the box and a projection along the full box), run, with the `dtfe` environment active (it includes `numpy` and `matplotlib`):
+
+```bash
+python demo/plot_density.py
+```
+
+The figure is saved to `demo/demo_density.png` (and also shown on screen if there is a display). In a Jupyter notebook you can use `%run demo/plot_density.py`. Use `python demo/plot_density.py --help` for the options.
 
 The configuration file is equivalent to the command line
 `./DTFE demo/gadget4_L50_N64_snap001.hdf5 demo/demo_output --input 105 3 --MpcUnit 1 --grid 256 --field density --periodic`.
