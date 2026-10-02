@@ -54,6 +54,8 @@ rho = np.fromfile('demo/demo_output.den', dtype=np.float32).reshape(n, n, n)
 delta = rho / rho.mean()      # density in units of the mean density
 ```
 
+To make a quick figure of the result (a slab through the middle of the box and a projection along the full box), run `python demo/plot_density.py` (or `%run demo/plot_density.py` in a Jupyter notebook). Use `python demo/plot_density.py --help` for the options.
+
 The configuration file is equivalent to the command line
 `./DTFE demo/gadget4_L50_N64_snap001.hdf5 demo/demo_output --input 105 3 --MpcUnit 1 --grid 256 --field density --periodic`.
 Note that `--periodic` is important for simulation boxes: without it, the cells close to the box edges are left empty.
