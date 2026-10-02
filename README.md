@@ -15,7 +15,7 @@ The code comes with a complete [documentation](documentation/DTFE_user_guide.pdf
 The public release of the code is summarised in the arxiv publication [Cautun et al. (2011)](https://ui.adsabs.harvard.edu/abs/2011arXiv1105.0370C/abstract) and it is based on the method paper [Schaap and van de Weygaert (2000)](https://ui.adsabs.harvard.edu/abs/2000A%26A...363L..29S/abstract).
 
 
-## Compiling
+## Compiling (new!)
 
 The easiest way to compile the code on any Linux computer or cluster is with [conda](https://docs.conda.io/en/latest/miniconda.html), which installs the compiler and all the required libraries (GSL, Boost, CGAL, GMP, MPFR and HDF5) in your home directory, without needing administrator rights or cluster modules:
 
