@@ -1,0 +1,86 @@
+From 7df69027543d3711680e03b2488ed95fa6d1f407 Mon Sep 17 00:00:00 2001
+From: Pablo Lopez <plopez@unc.edu.ar>
+Date: Fri, 2 Oct 2026 19:13:30 +0000
+Subject: [PATCH] README ready for new users: HTTPS clone, module purge,
+ plotting with the dtfe env
+
+- README: clone with HTTPS (works without SSH keys), 'module purge' in the
+  quick-start block, explain where the demo figure is saved
+- environment.yml: add numpy and matplotlib-base for demo/plot_density.py
+- plot_density.py: only call plt.show() when there is a display
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01C44ZCErHKsQgk681XW3FMn
+---
+ README.md            | 11 +++++++++--
+ demo/plot_density.py |  3 ++-
+ environment.yml      |  5 ++++-
+ 3 files changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/README.md b/README.md
+index ac28ff2..c2c8779 100644
+--- a/README.md
++++ b/README.md
+@@ -20,8 +20,9 @@ The public release of the code is summarised in the arxiv publication [Cautun et
+ The easiest way to compile the code on any Linux computer or cluster is with [conda](https://docs.conda.io/en/latest/miniconda.html), which installs the compiler and all the required libraries (GSL, Boost, CGAL, GMP, MPFR and HDF5) in your home directory, without needing administrator rights or cluster modules:
+ 
+ ```bash
+-git clone git@github.com:pabloplopez88/DTFE.git
++git clone https://github.com/pabloplopez88/DTFE.git
+ cd DTFE
++module purge                          # only on clusters with environment modules (see notes below)
+ conda env create -f environment.yml   # only the first time on each computer
+ conda activate dtfe
+ make
+@@ -54,7 +55,13 @@ rho = np.fromfile('demo/demo_output.den', dtype=np.float32).reshape(n, n, n)
+ delta = rho / rho.mean()      # density in units of the mean density
+ ```
+ 
+-To make a quick figure of the result (a slab through the middle of the box and a projection along the full box), run `python demo/plot_density.py` (or `%run demo/plot_density.py` in a Jupyter notebook). Use `python demo/plot_density.py --help` for the options.
++To make a quick figure of the result (a slab through the middle of the box and a projection along the full box), run, with the `dtfe` environment active (it includes `numpy` and `matplotlib`):
++
++```bash
++python demo/plot_density.py
++```
++
++The figure is saved to `demo/demo_density.png` (and also shown on screen if there is a display). In a Jupyter notebook you can use `%run demo/plot_density.py`. Use `python demo/plot_density.py --help` for the options.
+ 
+ The configuration file is equivalent to the command line
+ `./DTFE demo/gadget4_L50_N64_snap001.hdf5 demo/demo_output --input 105 3 --MpcUnit 1 --grid 256 --field density --periodic`.
+diff --git a/demo/plot_density.py b/demo/plot_density.py
+index 1f97d97..77b097c 100644
+--- a/demo/plot_density.py
++++ b/demo/plot_density.py
+@@ -63,7 +63,8 @@ def main():
+     if args.out:
+         fig.savefig(args.out, dpi=150)
+         print(f"Figure saved to '{args.out}'")
+-    plt.show()
++    if plt.get_backend().lower() != "agg":   # show the figure only if there is a display (e.g. not on a cluster terminal)
++        plt.show()
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/environment.yml b/environment.yml
+index a2d0162..2c6f924 100644
+--- a/environment.yml
++++ b/environment.yml
+@@ -3,7 +3,7 @@
+ #     conda env create -f environment.yml
+ #     conda activate dtfe
+ #     make
+-# To update the environment after changing this file:
++# To update an existing environment after changing this file:
+ #     conda env update -f environment.yml --prune
+ name: dtfe
+ channels:
+@@ -17,3 +17,6 @@ dependencies:
+   - gmp                 # needed by CGAL
+   - mpfr                # needed by CGAL
+   - hdf5                # includes the C++ interface (H5Cpp.h, libhdf5_cpp) used to read HDF5 snapshots
++  # only needed for demo/plot_density.py
++  - numpy
++  - matplotlib-base
+-- 
+2.43.0
+
