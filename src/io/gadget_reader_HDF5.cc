@@ -206,7 +206,8 @@ void HDF5_readGadgetData(std::string filename,
             group = new Group( file->openGroup(buf) );
             
             // open the data set
-            DataSet dataset = group->openDataSet("Velocity");
+            // Gadget-4 calls this dataset "Velocities", other codes (e.g. EAGLE) call it "Velocity"
+            DataSet dataset = group->openDataSet( H5Lexists(group->getId(), "Velocities", H5P_DEFAULT)>0 ? "Velocities" : "Velocity" );
             
             dataset.read( &(velocities[dataOffset]), PredType::NATIVE_FLOAT );
             delete group;
@@ -562,7 +563,8 @@ void HDF5_readGadgetData_HI(std::string filename,
             group = new Group( file->openGroup(buf) );
             
             // open the data set
-            DataSet dataset = group->openDataSet("Velocity");
+            // Gadget-4 calls this dataset "Velocities", other codes (e.g. EAGLE) call it "Velocity"
+            DataSet dataset = group->openDataSet( H5Lexists(group->getId(), "Velocities", H5P_DEFAULT)>0 ? "Velocities" : "Velocity" );
             
             dataset.read( &(velocities[dataOffset]), PredType::NATIVE_FLOAT );
             delete group;

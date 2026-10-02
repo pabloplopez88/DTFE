@@ -33,7 +33,30 @@ Notes:
 * Compile-time options (number of dimensions, velocity/scalar fields, default input/output formats, etc.) are set at the top of the `Makefile`.
 * Support for HDF5 snapshots is enabled automatically when the HDF5 C++ library is found. Use `make USE_HDF5=no` to disable it.
 * To use libraries installed elsewhere instead of conda (e.g. cluster modules), give their location: `make LIB_PREFIX=/path/to/prefix`, or each one separately with `GSL_PATH`, `BOOST_PATH`, `CGAL_PATH`, `MPRF_PATH` (GMP and MPFR) and `HDF5_PATH`. The compiler can be chosen with `make CXX=g++`.
-* Tested with CGAL 5.6 and 6.2, Boost 1.83 and 1.92, HDF5 1.10 and 2.2, and GCC 13.
+* On clusters, do not mix cluster modules with the conda environment: run `module purge` before `conda activate dtfe` and `make` (a loaded `gcc` module can make the conda compiler fail with `cannot execute 'cc1plus'`). Also use `module purge` in SLURM job scripts before running `DTFE`.
+* Tested with CGAL 5.6 and 6.2, Boost 1.83, 1.90 and 1.92, HDF5 1.10 and 2.2, and GCC 13 and 15.
+
+
+## Running the demo
+
+The [demo](demo) directory contains a small Gadget-4 HDF5 snapshot (64<sup>3</sup> dark matter particles in a periodic box of 50 Mpc, positions in Mpc) and a configuration file with all the options needed to compute its density field on a 256<sup>3</sup> grid. From the main directory of the repository run:
+
+```bash
+./DTFE --config demo/config_DTFE.cfg
+```
+
+This writes `demo/demo_output.den`: 256<sup>3</sup> single-precision floats (no header), which can be read in Python with
+
+```python
+import numpy as np
+n = 256
+rho = np.fromfile('demo/demo_output.den', dtype=np.float32).reshape(n, n, n)
+delta = rho / rho.mean()      # density in units of the mean density
+```
+
+The configuration file is equivalent to the command line
+`./DTFE demo/gadget4_L50_N64_snap001.hdf5 demo/demo_output --input 105 3 --MpcUnit 1 --grid 256 --field density --periodic`.
+Note that `--periodic` is important for simulation boxes: without it, the cells close to the box edges are left empty.
 
 
 ## The DTFE method

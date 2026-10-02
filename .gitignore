@@ -61,3 +61,6 @@ DTFE_include/
 # Jupyter / editor leftovers
 .ipynb_checkpoints/
 *~
+
+# output of the demo run
+demo/demo_output*
