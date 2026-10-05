@@ -108,12 +108,14 @@ inline Pvector<Real,noVelComp> velocityValue(Real velGrad[][noVelComp],
                                              Vertex_handle const & base,
                                              Point &samplePoint)
 {
+    // linear interpolation: v(x) = v_base + sum_j (dv/dx_j) * (x_j - x_base_j)
+    // (BUG FIX: the original code used '=' instead of '+=', so it kept only the last term of the sum)
     Pvector<Real,noVelComp> temp;
-    for (int i=0; i<NO_DIM; ++i)
+    for (size_t i=0; i<noVelComp; ++i)
     {
         temp[i] = 0.;
         for (int j=0; j<NO_DIM; ++j)
-            temp[i] = velGrad[j][i] * samplePoint[j];
+            temp[i] += velGrad[j][i] * samplePoint[j];
     }
     
     return temp + base->info().velocity();
@@ -156,7 +158,7 @@ Pvector<Real,noScalarComp> scalarValue(Real sGrad[][noScalarComp],
     {
         temp[i] = 0.;
         for (size_t j=0; j<NO_DIM; ++j)
-            temp[i] = sGrad[j][i] * samplePoint[j];
+            temp[i] += sGrad[j][i] * samplePoint[j];    // BUG FIX: '+=' instead of '=' (see velocityValue)
     }
     
     return temp + base->info().myScalar();
