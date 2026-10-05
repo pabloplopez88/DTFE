@@ -162,13 +162,6 @@ void readInputData(std::vector<Particle_data> *p,
 }
 
 
-
-
-
-
-
-
-
 //! Functions for writing the output data
 
 
@@ -227,10 +220,20 @@ void writeOutputData(Quantities &uQuantities,
     
     // outputs the velocity
     if ( userOptions.uField.velocity )
-        output.write( uQuantities.velocity, userOptions.outputFilename + ".vel", "velocity", userOptions );
+    {
+        if (userOptions.magnetic_field )
+          output.write( uQuantities.velocity, userOptions.outputFilename + ".mag", "magnetic field", userOptions );
+        else
+          output.write( uQuantities.velocity, userOptions.outputFilename + ".vel", "velocity", userOptions );
+    }
     if ( userOptions.aField.velocity )
-        output.write( aQuantities.velocity, userOptions.outputFilename + ".a_vel", "volume averaged velocity", userOptions );
-    
+    {
+        if (userOptions.magnetic_field )
+          output.write( aQuantities.velocity, userOptions.outputFilename + ".a_mag", "volume averaged magnetic field", userOptions );
+        else
+          output.write( aQuantities.velocity, userOptions.outputFilename + ".a_vel", "volume averaged velocity", userOptions );
+    }
+
     // outputs the velocity gradient
     if ( userOptions.uField.velocity_gradient )
         output.write( uQuantities.velocity_gradient, userOptions.outputFilename + ".velGrad", "velocity gradient", userOptions );

@@ -89,17 +89,17 @@ void HDF5_readGadgetHeader(std::string filename,
     if ( doesAttributeExist( group->getId(), name.c_str() ) )
         group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->time) );
     
-    name = "Omega0";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->Omega0) );
+    //name = "Omega0";
+    //if ( doesAttributeExist( group->getId(), name.c_str() ) )
+    //    group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->Omega0) );
     
-    name = "OmegaLambda";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->OmegaLambda) );
+    //name = "OmegaLambda";
+    //if ( doesAttributeExist( group->getId(), name.c_str() ) )
+    //    group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->OmegaLambda) );
     
-    name = "HubbleParam";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->HubbleParam) );
+    //name = "HubbleParam";
+    //if ( doesAttributeExist( group->getId(), name.c_str() ) )
+    //    group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->HubbleParam) );
     
     
     // close the group and file

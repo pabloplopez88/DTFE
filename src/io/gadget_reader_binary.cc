@@ -66,6 +66,7 @@ void initializeGadget(std::string filename,
                       bool *swapEndian,
                       size_t *noParticles)
 {
+/*
     MESSAGE::Message message( userOptions->verboseLevel );
     std::string fileName = filename;
     bool singleFile = true;
@@ -79,7 +80,34 @@ void initializeGadget(std::string filename,
     // open the first binary file for reading and read some of the overall characteristics
     std::fstream inputFile;
     openInputBinaryFile( inputFile, fileName );
+*/
 
+    MESSAGE::Message message( userOptions->verboseLevel );
+    std::string fileName = filename;
+    bool singleFile = true;
+    
+    fprintf(stdout,"%s %s ---- %d\n",filename.c_str(),fileName.c_str(),bfs::exists(fileName) );
+    fflush(stdout);
+    
+    if ( not bfs::exists(fileName) ) //if this is true, than the input is in several files
+    {
+        fileName += "0";
+        fileName = gadgetHeader->filename( fileName, 0 );
+	fprintf(stdout,"Dentro %s\n",fileName.c_str());
+        singleFile = false;
+    }
+    else
+    {
+	fprintf(stdout,"else %s %s\n",fileName.c_str(), gadgetHeader->filename(filename,0));
+	fflush(stdout);
+    }
+
+    fprintf(stdout,"out %s %s\n",filename.c_str(),fileName.c_str());
+    fflush(stdout);
+
+    // open the first binary file for reading and read some of the overall characteristics
+    std::fstream inputFile;
+    openInputBinaryFile( inputFile, fileName );
 
     // detect the Gadget file type -> gadget file type 1 or 2
     int buffer1, buffer2, buffer3, buffer4;       // variables to read the buffer before and after each gadget data block
@@ -328,6 +356,7 @@ void readGadgetData(std::string fileName,
 
     // read the position block
     READ_DELIMETER;
+    printf("--- DATABLOCK 1: %d ---\n",buffer1);
     if ( userOptions.readParticleData[0] )
     {
         Real *positions = readData->position();                 // returns a pointer to the particle positions array

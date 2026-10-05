@@ -2,22 +2,32 @@
 
 
 # Path to the GSL, Boost C++ and CGAL libraries - must be set by user (only if they aren't installed in the default system path) -- (NOTE: You must add only the directory where the libraries are installed, the program will add the '/lib' and '/include' parts automatically); C++ compiler - preferably a version that supports OpenMP
-GSL_PATH   = /cosma/local/gsl/2.4
-BOOST_PATH = /cosma/local/boost/gnu_7.3.0/1_67_0
-CGAL_PATH  = /cosma/home/dphlss/cautun/Programs/stow
-MPRF_PATH  = /cosma/home/dphlss/cautun/Programs/stow
-CC = g++
-# set the following if you have installed the HDF5 library and would like to read in HDF5 gadget files (you need to compile the HDF5 library with the '--enable-cxx' configure option)
-HDF5_PATH  = /cosma/local/hdf5/gnu_7.3.0/1.10.3
 
+# MIRTA 3
+####GSL_PATH   = 
+####BOOST_PATH =
+####GMP_PATH   = 
+####MPRF_PATH  = 
+####MPI_PATH   = 
+#####HDF5_PATH  = /opt/spack/0.16.2/opt/spack/linux-centos7-bulldozer/gcc-10.2.0/hdf5-1.10.7-xlobz5dd2qcvcg74ybngf24n32twemug/
+
+# SERSIC
+GSL_PATH   = /home/plopez/is2/plopez 
+BOOST_PATH = /home/plopez/is2/plopez/pablo/software/boost_1_70_0
+CGAL_PATH  = /home/plopez/is2/plopez/pablo/CGAL
+GMP_PATH   = /home/plopez/is2/plopez
+MPFR_PATH  = /opt/spack/dev/opt/spack/linux-centos7-x86_64_v3/gcc-4.8.5/mpfr-4.1.0-febaoyzxg6si64suwhaaz57invczwgoo 
+MPI_PATH = /opt/spack/dev/opt/spack/linux-centos7-x86_64_v3/gcc-12.1.0/openmpi-4.1.3-3yi5sfwmpypxnc3oe7hiz77isaynwqk5/
+HDF5_PATH = /opt/spack/dev/opt/spack/linux-centos7-x86_64_v3/gcc-12.1.0/hdf5-1.12.2-23eltrs34e344mub4v3a7ug4wvtpu2ja/
+# MPI_PATH = /opt/spack/1.1.0/opt/spack/linux-zen3/openmpi-5.0.8-2a4ormtwytmxjbi2vztvhhb4fk424x7z
+# HDF5_PATH = /opt/spack/1.1.0/opt/spack/linux-zen3/hdf5-1.14.5-kboxo3gddvlxkmcpku4ozvzthu3ltdyq
+CC = g++
 
 # paths to where to put the object files and the executables files. If you build the DTFE library than you also need to specify the directory where to put the library and the directory where to copy the header files needed by the library (choose an empty directory for the header files).
 OBJ_DIR = ./o
 BIN_DIR = ./
 LIB_DIR = ./
 INC_DIR = ./DTFE_include
-
-
 
 ############################# Choose the compiler directives ##################################
 
@@ -31,18 +41,18 @@ OPTIONS += -DNO_DIM=3
 ############################# Quantities to be computed ##################################
 #------------------------ set which quantities can be computed (can save memory by leaving some out)
 # Comment this line if you don't need to compute velocity and velocity related components 
-OPTIONS += -DVELOCITY 
+ OPTIONS += -DVELOCITY 
 # Comment this line if you don't need to interpolate additional fields stored in the scalar variable
-OPTIONS += -DSCALAR 
+#OPTIONS += -DSCALAR 
 # number of components of the scalar variable
-OPTIONS += -DNO_SCALARS=1 
+#OPTIONS += -DNO_SCALARS=1 
 
 ############################# Input and output operations default settings ##################################
 #------------------------ set which are the default input and output functions for doing data io
 # default function to read the input data (101-multiple gadget file, 102-single gadget file, 105-HDF5 gadget file, 111-text file, ... see documentation for more options). The input file type can be set during runtime using the option '--input'. This makefile option only sets a default input file in the case none is given via the program options.
-OPTIONS += -DINPUT_FILE_DEFAULT=101 
+OPTIONS += -DINPUT_FILE_DEFAULT=131 
 # default value for the units of the input data (value=what is 1 Mpc in the units of the data - in this example the data is in kpc). You can change this also during runtime using the program option '--MpcUnit'.
-OPTIONS += -DMPC_UNIT=1000. 
+OPTIONS += -DMPC_UNIT=1. 
 # default function to write the output data (101-binary file, 111-text file, ... see documentation for more options). The output file type can be set during runtime using the option '--output'. This makefile option only sets a default output file in the case none is given via the program options.
 OPTIONS += -DOUTPUT_FILE_DEFAULT=101  
 #101 for binary file, 100 my density file
@@ -53,7 +63,9 @@ OPTIONS += -DOPEN_MP
 # enable to check if the padding gives a complete Delaunay Tesselation of the region of interest
 # OPTIONS += -DTEST_PADDING 
 # enable this option to shift from position space to redshift space; You also need to activate this option during run-time using '--redshift-space arguments'
-OPTIONS += -DREDSHIFT_SPACE
+# OPTIONS += -DREDSHIFT_SPACE
+OPTIONS += -DHDF5 # PARA SWIFT
+# OPTIONS += -DTYPE_FOUR_GADGET # PARA USAR GADGET 4 VERSIÓN POLACO
 
 #------------------------ options usefull when using DTFE as a library
 # uncomment the line to get access to a function that returns the Delaunay triangulation of the point set
@@ -70,11 +82,10 @@ OPTIONS += -DAVERAGING_OPTIONS
 # OPTIONS += -DREDSHIFT_CONE_OPTIONS 
 OPTIONS += -DADDITIONAL_OPTIONS 
 
-
-
-
-
-
+## My Options
+#OPTIONS += -DCUT_REGION
+OPTIONS += -DWEIGHT
+#OPTIONS += -DPERCENT
 
 
 ###############  DO NOT MODIFY BELOW THIS LINE  ###########################
@@ -89,26 +100,42 @@ ifneq ($(strip $(GSL_PATH)),)
 endif
 ifneq ($(strip $(BOOST_PATH)),)
 	INCLUDES += -I/$(strip $(BOOST_PATH))/include 
-	LIBRARIES += -L/$(strip $(BOOST_PATH))/lib 
+	LIBRARIES += -L/$(strip $(BOOST_PATH))/stage/lib
 endif
 ifneq ($(strip $(CGAL_PATH)),)
 	INCLUDES += -I/$(strip $(CGAL_PATH))/include 
-	LIBRARIES += -L/$(strip $(CGAL_PATH))/lib 
+	LIBRARIES += -L/$(strip $(CGAL_PATH))/lib
+	#LIBRARIES += -L/$(strip $(CGAL_PATH))/lib 
 endif
 ifneq ($(strip $(HDF5_PATH)),)
-	INCLUDES += -I/$(strip $(HDF5_PATH))/include 
-	LIBRARIES += -L/$(strip $(HDF5_PATH))/lib -lhdf5 -lhdf5_cpp
-	OPTIONS += -DHDF5
+	INCLUDES += -I$(strip $(HDF5_PATH))/include 
+	LIBRARIES += -L$(strip $(HDF5_PATH))/lib -lhdf5 -lhdf5_cpp
+endif
+ifneq ($(strip $(GMP_PATH)),)
+	INCLUDES += -I/$(strip $(GMP_PATH))/include 
+	LIBRARIES += -L/$(strip $(GMP_PATH))/lib 
+endif
+ifneq ($(strip $(MPFR_PATH)),)
+	INCLUDES += -I/$(strip $(MPFR_PATH))/include 
+	LIBRARIES += -L/$(strip $(MPFR_PATH))/lib 
+endif
+ifneq ($(strip $(MPI_PATH)),)
+	INCLUDES += -I/$(strip $(MPI_PATH))/include 
+	LIBRARIES += -L/$(strip $(MPI_PATH))/lib 
 endif
 
+# Librerías de MPI
+MPI_LIBS = \
+    -L$(MPI_PATH)/lib \
+    -lmpi_cxx \
+    -lmpi \
+    -lopen-rte \
+    -lopen-pal
 
-
-COMPILE_FLAGS = -frounding-math -O3 -fopenmp -DNDEBUG $(OPTIONS)
+COMPILE_FLAGS = -frounding-math -O3 -fopenmp -DNDEBUG -fpermissive $(OPTIONS)
 DTFE_INC = $(INCLUDES)
 # the following libraries should work in most cases
-DTFE_LIB = $(LIBRARIES) -lCGAL -lboost_thread -lboost_filesystem -lboost_program_options -lgsl -lgslcblas -lm  -lgmp -lmpfr -lboost_system
-
-
+DTFE_LIB = $(LIBRARIES) -lCGAL -lboost_thread -lboost_filesystem -lboost_program_options -lgsl -lgslcblas -lm  -lgmp -lmpfr -lboost_system $(MPI_LIBS)
 
 IO_SOURCES = $(addprefix io/, input_output.h gadget_reader_header.cc gadget_reader_binary.cc gadget_reader_HDF5.cc gadget_reader_HDF5_Cristian.cc gadget_reader_MOG.cc hdf5_input_my_DESI.cc text_io.cc binary_io.cc my_io.cc)
 MAIN_SOURCES = main.cpp DTFE.h message.h user_options.h input_output.cc $(IO_SOURCES)

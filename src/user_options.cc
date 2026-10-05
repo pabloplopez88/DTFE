@@ -91,6 +91,7 @@ User_options::User_options()
     noProcessors = 1;
     totalTime = Real(0.);
     programOptions = "";
+    magnetic_field = false;
 }
 
 
@@ -114,6 +115,7 @@ void User_options::addOptions(po::options_description &allOptions,
             ("input,i", po::value< std::vector<int> >()->multitoken(), "give the type of the input file (101=gadget multiple file, 102=gadget single file, 105=gadget HDF5 file, see documenation for more options). If present, a 2nd argument gives the data to be read from file (1=positions, 2=weights, 4=masses, ..., 2^n=the n+1 data) - e.g. to read positions, masses and velocities insert 1+2+4=7. If present, a 3rd argument gives the particle species to be read from file (1=1st species, 2=2nd species, ..., 2^n=the n+1 species) - e.g. to read the data of species 2,3 and 4 insert 2+4+8=14.")
             ("output,o", po::value< int >(&(this->outputFileType)), "give the type of the output file (101=binary file, 111=text file, see documenation for more options).")
             ("periodic,p", "particle data is in a periodic box with box coordinates given by option '--box' or read from input file.")
+            ("magnetic_field", "si quiero que calcule el campo magnético en lugar del campo de velocidad")
             ;
     
     
@@ -522,6 +524,11 @@ void User_options::printOptions()
         message << "\n\n~~~WARNING~~~ No grid size specified. Unless the input data file specifies the grid size for the output result, the program will end with and error message!\n\n";
     
     message << "\n" << MESSAGE::Flush;
+
+    if ( this->magnetic_field )
+    {
+        message << "\t Vamos a interpolar el campo magnético en lugar de la velocidad\n";
+    }
 }
 
 
@@ -645,6 +652,8 @@ void User_options::readOptions(int argc, char *argv[], bool getFileNames, bool s
     if ( vm.count("periodic") )
         this->periodic = true;
     
+    if ( vm.count("magnetic_field") )
+        this->magnetic_field = true;
     
     // read which field to compute using the DTFE method
     if ( vm.count("field") )

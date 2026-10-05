@@ -228,8 +228,10 @@ struct Density_header
             inputFile.read( reinterpret_cast<char *>(&gadgetHeader), sizeof(gadgetHeader) );
             inputFile.close();
         }
+        #ifdef HDF5
         else if ( userOptions.inputFileType==105 )
             HDF5_readGadgetHeader( filename, &gadgetHeader );
+	#endif
         else
             return;
         

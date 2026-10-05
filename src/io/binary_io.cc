@@ -51,15 +51,17 @@ void readBinaryFile(std::string filename,
     int noParticles;
     float boxCoordinates[2*NO_DIM];
     inputFile.read( reinterpret_cast<char *>(&noParticles), sizeof(noParticles) );
-    inputFile.read( reinterpret_cast<char *>(boxCoordinates), sizeof(float) );
+    inputFile.read( reinterpret_cast<char *>(boxCoordinates), sizeof(boxCoordinates) );
     for (size_t i=0; i<2*NO_DIM; ++i)
         userOptions->boxCoordinates[i] = boxCoordinates[i];
     
+    printf("\n%d\n",noParticles);
+    printf("%f %f %f %f %f %f\n",boxCoordinates[0],boxCoordinates[1],boxCoordinates[2],boxCoordinates[3],boxCoordinates[4],boxCoordinates[5]);
     
     // reserve memory for the input data
-    Real *positions = readData->position(noParticles);  //particle positions
-    Real *weights = readData->weight(noParticles);      //particle weights (e.g. weights = particle masses)
-    Real *velocities = readData->velocity(noParticles); //particle velocities
+    Real *positions  = readData->position(noParticles);  //particle positions
+    Real *weights    = readData->weight(noParticles);    //particle weights (e.g. weights = particle masses)
+    Real *velocities = readData->velocity(noParticles);  //particle velocities
     
     
     // read the rest of the input data: positions, weights and velocities
@@ -67,10 +69,10 @@ void readBinaryFile(std::string filename,
     inputFile.read( reinterpret_cast<char *>(positions), dataSize );
     
     dataSize = noParticles * sizeof(float);    // number of data bytes that store the particle weights (1*4 bytes per particle)
-    inputFile.read( reinterpret_cast<char *>(positions), dataSize );
+    inputFile.read( reinterpret_cast<char *>(weights), dataSize );
     
     dataSize = noParticles * sizeof(float) * NO_DIM;    // number of data bytes that store the particle velocities (3*4 bytes per particle)
-    inputFile.read( reinterpret_cast<char *>(positions), dataSize );
+    inputFile.read( reinterpret_cast<char *>(velocities), dataSize );
     
     checkFileOperations( inputFile, "read from" );   // check that the data reading was succesful
     inputFile.close();

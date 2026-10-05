@@ -196,6 +196,8 @@ struct User_options
     void updateEntries(size_t const noTotalParticles,
                        bool userSampling);   // used to update, after reading the input data file, some of the members of this class: paddedBox, fullBoxOffset, fullBoxLength; Also does error checking of member values in the class.
     void updatePadding(size_t const noParticles); // computes the value of the padding length
+
+    bool magnetic_field;      // true si quiero calcular campo magnético en lugar de campo de velocidad
 };
 
 
