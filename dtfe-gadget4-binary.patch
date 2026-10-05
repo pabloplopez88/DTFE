@@ -1,0 +1,293 @@
+From f98aaddd46476b732db8f4e3f9d31409d22391c0 Mon Sep 17 00:00:00 2001
+From: Pablo Lopez <plopez@unc.edu.ar>
+Date: Fri, 2 Oct 2026 21:28:59 +0000
+Subject: [PATCH] Read Gadget-4 binary snapshots (tries the Gadget-2 header
+ first, then Gadget-4)
+
+- Gadget_header::readHeaderBlock(): reads the header block of a binary
+  snapshot trying the Gadget-1/2 header (256 bytes) first and then the
+  default Gadget-4 header (24*N+48 bytes); stops with an error only if
+  none matches. The header is stored in the Gadget-2 layout.
+- Used in all the places that read binary Gadget headers (first file,
+  particle count of multi-file snapshots, per-file reading, density file
+  header info), formats 1 and 2.
+- Fix reading of snapshots with opposite endianness (block sizes were not
+  byte-swapped before seeking).
+- README: supported Gadget formats.
+
+Tested against an HDF5 reference with identical particles: Gadget-2 and
+Gadget-4 headers, formats 1 and 2, float and double positions, 64-bit IDs,
+multi-file snapshots and big-endian files all give identical density and
+velocity fields. Gadget-2 results are unchanged with respect to the
+previous code.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01C44ZCErHKsQgk681XW3FMn
+---
+ README.md                      |   1 +
+ src/io/density_file_io.cc      |   4 +-
+ src/io/gadget_reader_binary.cc |  34 ++++------
+ src/io/gadget_reader_header.cc | 115 ++++++++++++++++++++++++++++++---
+ 4 files changed, 120 insertions(+), 34 deletions(-)
+
+diff --git a/README.md b/README.md
+index 8982c43..b052243 100644
+--- a/README.md
++++ b/README.md
+@@ -35,6 +35,7 @@ Notes:
+ * Support for HDF5 snapshots is enabled automatically when the HDF5 C++ library is found. Use `make USE_HDF5=no` to disable it.
+ * To use libraries installed elsewhere instead of conda (e.g. cluster modules), give their location: `make LIB_PREFIX=/path/to/prefix`, or each one separately with `GSL_PATH`, `BOOST_PATH`, `CGAL_PATH`, `MPRF_PATH` (GMP and MPFR) and `HDF5_PATH`. The compiler can be chosen with `make CXX=g++`.
+ * On clusters, do not mix cluster modules with the conda environment: run `module purge` before `conda activate dtfe` and `make` (a loaded `gcc` module can make the conda compiler fail with `cannot execute 'cc1plus'`). Also use `module purge` in SLURM job scripts before running `DTFE`.
++* Gadget binary snapshots (`--input 101` or `102`, formats 1 and 2) are read with either the Gadget-1/2 header or the Gadget-4 header (the default of Gadget-4 when it is compiled without `GADGET2_HEADER`): the program tries the Gadget-2 header first, then the Gadget-4 one, and stops with an error only if none matches. Positions and velocities can be in single or double precision, and files with the opposite endianness are also supported. Gadget HDF5 snapshots (`--input 105`) are read from both Gadget-2/3 and Gadget-4.
+ * Tested with CGAL 5.6 and 6.2, Boost 1.83, 1.90 and 1.92, HDF5 1.10 and 2.2, and GCC 13 and 15.
+ 
+ 
+diff --git a/src/io/density_file_io.cc b/src/io/density_file_io.cc
+index d80b6d5..43047b6 100644
+--- a/src/io/density_file_io.cc
++++ b/src/io/density_file_io.cc
+@@ -223,9 +223,9 @@ struct Density_header
+             bool validFile = gadgetHeader.detectSnapshotType( buffer, &gadgetFileType, &swapEndian );
+             if ( not validFile )
+                 return;
+-            int offset = gadgetFileType==2 ? 16+sizeof(buffer) : 0+sizeof(buffer);
++            int offset = gadgetFileType==2 ? 16 : 0;
+             inputFile.seekg( offset, std::ios::beg );
+-            inputFile.read( reinterpret_cast<char *>(&gadgetHeader), sizeof(gadgetHeader) );
++            gadgetHeader.readHeaderBlock( inputFile, swapEndian, filename );   // Gadget-1/2 or Gadget-4 header
+             inputFile.close();
+         }
+ #ifdef HDF5
+diff --git a/src/io/gadget_reader_binary.cc b/src/io/gadget_reader_binary.cc
+index ff4e68e..91d076a 100644
+--- a/src/io/gadget_reader_binary.cc
++++ b/src/io/gadget_reader_binary.cc
+@@ -92,26 +92,23 @@ void initializeGadget(std::string filename,
+     int offset = (*gadgetFileType)==2 ? 16 : 0;      // keep track if file type 2 to have a 16 bytes offset every time reading a new data block
+ 
+ 
+-    // now read the actual values of the gadget header
++    // now read the actual values of the gadget header (it tries first the Gadget-1/2 header and then the Gadget-4 one)
+     inputFile.seekg( offset, std::ios::beg );
+-    inputFile.read( reinterpret_cast<char *>(&buffer1), sizeof(buffer1) );
+-    inputFile.read( reinterpret_cast<char *>(gadgetHeader), sizeof(*gadgetHeader) );
+-    inputFile.read( reinterpret_cast<char *>(&buffer2), sizeof(buffer2) );
+-    SWAP_HEADER_ENDIANNESS( *swapEndian, buffer1, buffer2, (*gadgetHeader) ); //swap endianness if that is the case  
++    int headerType = gadgetHeader->readHeaderBlock( inputFile, *swapEndian, fileName );
++    if ( headerType==4 )
++        message << "Detected a GADGET-4 snapshot header (Gadget-4 binary snapshot written without the GADGET2_HEADER option).\n" << MESSAGE::Flush;
+     
+     // get the type (float/double) used to store position and velocity data
+     inputFile.seekg( offset, std::ios::cur );
+     inputFile.read( reinterpret_cast<char *>(&buffer3), sizeof(buffer3) );
++    if ( *swapEndian ) BYTESWAP( buffer3 );
+     inputFile.seekg( buffer3, std::ios::cur );
+     inputFile.seekg( offset, std::ios::cur );
+     inputFile.read( reinterpret_cast<char *>(&buffer4), sizeof(buffer4) );
+     inputFile.read( reinterpret_cast<char *>(&buffer4), sizeof(buffer4) );
++    if ( *swapEndian ) BYTESWAP( buffer4 );
+     inputFile.close();
+     
+-    SWAP_HEADER_ENDIANNESS( *swapEndian, buffer1, buffer2, (*gadgetHeader) ); //swap endianness if that is the case
+-    if ( buffer1!=buffer2 or buffer1!=256 )
+-        throwError( "The was an error while reading the header of the GADGET snapshot file. The integers before and after the header do not match the value 256. The GADGET snapshot file is corrupt." );
+-    
+     // compute the number of bytes used to save each real value
+     int thisNoParts = 0;
+     for (int i=0; i<6; ++i)
+@@ -276,16 +273,10 @@ void countGadgetParticleNumber(std::string filenameRoot,
+         std::fstream inputFile;
+         openInputBinaryFile( inputFile, fileName );
+ 
+-        // read the header
+-        int buffer1, buffer2;
++        // read the header (Gadget-1/2 or Gadget-4)
+         inputFile.seekg( offset, std::ios::beg );
+-        inputFile.read( reinterpret_cast<char *>(&buffer1), sizeof(buffer1) );
+-        inputFile.read( reinterpret_cast<char *>(&gadgetHeader), sizeof(gadgetHeader) );
+-        inputFile.read( reinterpret_cast<char *>(&buffer2), sizeof(buffer2) );
++        gadgetHeader.readHeaderBlock( inputFile, swapEndian, fileName );
+         inputFile.close();
+-        SWAP_HEADER_ENDIANNESS( swapEndian, buffer1, buffer2, gadgetHeader ); //swap endianness if that is the case
+-        if ( buffer1!=buffer2 or buffer1!=256 )
+-            throwError( "The was an error while reading the header of the GADGET snapshot file '" + fileName + "'. The integers before and after the header do not match the value 256. The GADGET snapshot file is corrupt." );
+ 
+         // add the particle numbers
+         for (int j=0; j<6; ++j)
+@@ -318,14 +309,11 @@ void readGadgetData(std::string fileName,
+     openInputBinaryFile( inputFile, fileName );
+ 
+ 
+-    // read the header
++    // read the header (Gadget-1/2 or Gadget-4)
+     int buffer1, buffer2;
+     Gadget_header tempHeader;
+-    READ_DELIMETER;
+-    inputFile.read( reinterpret_cast<char *>(&tempHeader), sizeof(tempHeader) );
+-    DELIMETER_CONSISTANCY_CHECK("header");
+-    if ( buffer1!=256 )
+-        throwError( "The integers before and after the header do not match the value 256. The GADGET snapshot file is corrupt." );
++    inputFile.seekg( offset, std::ios::cur );
++    tempHeader.readHeaderBlock( inputFile, swapEndian, fileName );
+ 
+ 
+     // read the position block
+diff --git a/src/io/gadget_reader_header.cc b/src/io/gadget_reader_header.cc
+index b463010..c0d3da0 100644
+--- a/src/io/gadget_reader_header.cc
++++ b/src/io/gadget_reader_header.cc
+@@ -21,14 +21,18 @@
+  */
+  
+  
++#include <cstring>
++#include <vector>
++
+ #define SWAP_HEADER_ENDIANNESS(x1,x2,x3,x4) { if( x1 ) {BYTESWAP( x2 ); BYTESWAP( x3 ); x4.swapBytes();} }
+ #define SWAP_ENDIANNESS(x1,x2,x3)           { if( x1 ) {BYTESWAP( x2 ); BYTESWAP( x3 );} }
+ #define READ_DELIMETER \
+     inputFile.seekg( offset, std::ios::cur ); \
+-    inputFile.read( reinterpret_cast<char *>(&buffer1), sizeof(buffer1) )
++    inputFile.read( reinterpret_cast<char *>(&buffer1), sizeof(buffer1) ); \
++    if ( swapEndian ) BYTESWAP( buffer1 )
+ #define DELIMETER_CONSISTANCY_CHECK(field) \
+     inputFile.read( reinterpret_cast<char *>(&buffer2), sizeof(buffer2) ); \
+-    SWAP_ENDIANNESS( swapEndian, buffer1, buffer2 ); \
++    if ( swapEndian ) BYTESWAP( buffer2 ); \
+     if ( buffer1!=buffer2 ) \
+         throwError( "The integers before and after the particle " field " data block in the GADGET file '" + fileName + "' did not match. The GADGET snapshot file is corrupt." )
+ 
+@@ -100,7 +104,26 @@ struct Gadget_header
+         BYTESWAP( HubbleParam );
+     }
+ 
+-    // Checks for the type of the Gadget file -> can detected Gadget file type 1 & 2. Returns true if it could identify the gadget file type.
++    /* Gadget-4 (unless compiled with the GADGET2_HEADER option) writes a different header to its binary snapshots (SnapFormat 1 and 2):
++            long long npart[N];  long long npartTotal[N];  double mass[N];  double time, redshift, BoxSize;
++            int num_files;  long long Ntrees, TotNtrees;
++       with N the number of particle types (6 by default). Its size is 24*N+48 bytes (192 bytes for N=6).
++       Returns true if 'blockSize' is the size of such a header and stores N in 'noTypes'. */
++    static bool isGadget4HeaderSize(int const blockSize, int *noTypes)
++    {
++        if ( blockSize<=48 or (blockSize-48)%24!=0 or blockSize==256 ) return false;
++        *noTypes = (blockSize-48) / 24;
++        return (*noTypes)>=1 and (*noTypes)<=64;
++    }
++
++    // Returns true if 'blockSize' is the size of a header that can be read: Gadget-1/2 (256 bytes) or Gadget-4.
++    static bool isKnownHeaderSize(int const blockSize)
++    {
++        int noTypes;
++        return blockSize==256 or isGadget4HeaderSize( blockSize, &noTypes );
++    }
++
++    // Checks for the type of the Gadget file -> can detect Gadget file type 1 & 2, with a Gadget-1/2 or a Gadget-4 header. Returns true if it could identify the gadget file type.
+     bool detectSnapshotType(int const bufferValue,
+                             int *gadgetFileType,
+                             bool *swapEndian)
+@@ -108,22 +131,96 @@ struct Gadget_header
+         int buffer1 = bufferValue;
+         *swapEndian = false;
+ 
+-        if ( buffer1 == 8 )             // gadget file format 2
++        if ( buffer1 == 8 )                         // gadget file format 2
+             *gadgetFileType = 2;
+-        else if ( buffer1 == 256 )      // gadget file format 1
++        else if ( isKnownHeaderSize(buffer1) )      // gadget file format 1 (Gadget-1/2 or Gadget-4 header)
+             *gadgetFileType = 1;
+-        else                            // check for swapped endianness
++        else                                        // check for swapped endianness
+         {
+             BYTESWAP( buffer1 );
+             *swapEndian = true;
+-            if ( buffer1 == 8 )         // gadget file format 2
++            if ( buffer1 == 8 )                     // gadget file format 2
+                 *gadgetFileType = 2;
+-            else if ( buffer1 == 256 )  // gadget file format 1
++            else if ( isKnownHeaderSize(buffer1) )  // gadget file format 1
+                 *gadgetFileType = 1;
+-            else                        // could not detect the file type
++            else                                    // could not detect the file type
+                 return false;
+         }
+         return true;
+     }
++
++    /* Reads the header data block (including the integers before and after it) from a Gadget binary snapshot. The file must be positioned at the
++       beginning of the header block (after the 16 bytes block label for Gadget file format 2). It first tries the Gadget-1/2 header (256 bytes),
++       then the Gadget-4 header; if none of them matches it stops the program. The header is always stored in the Gadget-1/2 layout of this
++       structure, with the native endianness. Returns 2 for a Gadget-1/2 header and 4 for a Gadget-4 header. */
++    int readHeaderBlock(std::fstream &inputFile,
++                        bool const swapEndian,
++                        std::string const &fileName)
++    {
++        int buffer1, buffer2, noTypes, headerType;
++        inputFile.read( reinterpret_cast<char *>(&buffer1), sizeof(buffer1) );
++        if ( swapEndian ) BYTESWAP( buffer1 );
++
++        if ( buffer1==256 )                                     // Gadget-1/2 header
++        {
++            inputFile.read( reinterpret_cast<char *>(this), 256 );
++            if ( swapEndian ) this->swapBytes();
++            headerType = 2;
++        }
++        else if ( isGadget4HeaderSize(buffer1, &noTypes) )      // Gadget-4 header
++        {
++            std::vector<char> raw( buffer1 );
++            inputFile.read( &(raw[0]), buffer1 );
++            this->setFromGadget4Header( &(raw[0]), noTypes, swapEndian, fileName );
++            headerType = 4;
++        }
++        else
++            throwError( "Could not read the header of the GADGET snapshot file '" + fileName + "'. Tried the Gadget-1/2 header (256 bytes) and the Gadget-4 header (24*N+48 bytes for N particle types), but the header block has a different size. The file is corrupt or is not a GADGET binary snapshot." );
++
++        inputFile.read( reinterpret_cast<char *>(&buffer2), sizeof(buffer2) );
++        if ( swapEndian ) BYTESWAP( buffer2 );
++        if ( not inputFile or buffer1!=buffer2 )
++            throwError( "The integers before and after the header of the GADGET snapshot file '" + fileName + "' do not match. The GADGET snapshot file is corrupt." );
++        return headerType;
++    }
++
++    // Copies the values of a Gadget-4 header (stored in 'raw') to this structure.
++    void setFromGadget4Header(char const *raw,
++                              int const noTypes,
++                              bool const swapEndian,
++                              std::string const &fileName)
++    {
++        std::memset( this, 0, sizeof(*this) );
++        size_t const N = noTypes;
++        for (size_t i=0; i<N; ++i)
++        {
++            long long np    = readValue<long long>( raw + 8*i, swapEndian );
++            long long npTot = readValue<long long>( raw + 8*(N+i), swapEndian );
++            double    m     = readValue<double>( raw + 8*(2*N+i), swapEndian );
++            if ( i>=6 )         // DTFE works with 6 particle types
++            {
++                if ( np!=0 ) throwError( "The GADGET snapshot file '" + fileName + "' has particles of type 6 or larger, but DTFE can only read the particle types 0 to 5." );
++                continue;
++            }
++            if ( np>2147483647LL ) throwError( "The GADGET snapshot file '" + fileName + "' has more than 2^31 particles of one type in a single file. Please write the snapshot in several files." );
++            npart[i] = int( np );
++            npartTotal[i] = int( npTot & 0xffffffffLL );   // only used for information (as the low word in Gadget-2)
++            mass[i] = m;
++        }
++        time      = readValue<double>( raw + 24*N,      swapEndian );
++        redshift  = readValue<double>( raw + 24*N + 8,  swapEndian );
++        BoxSize   = readValue<double>( raw + 24*N + 16, swapEndian );
++        num_files = readValue<int>(    raw + 24*N + 24, swapEndian );
++    }
++
++    // Reads a value of type T from a byte array, swapping the endianness if needed.
++    template <typename T>
++    static T readValue(char const *p, bool const swapEndian)
++    {
++        T value;
++        std::memcpy( &value, p, sizeof(T) );
++        if ( swapEndian ) BYTESWAP( value );
++        return value;
++    }
+ };
+ 
+-- 
+2.43.0
+
