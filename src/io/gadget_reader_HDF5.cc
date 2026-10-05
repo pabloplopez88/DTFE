@@ -25,6 +25,9 @@
 // The following are the functions used to read an HDF5 gadget file
 #ifdef HDF5
 #include <H5Cpp.h>
+#include <cstring>
+#include <cmath>
+#include <vector>
 using namespace H5;
 
 
@@ -40,70 +43,138 @@ extern "C"
 
 
 
+/*! Reads the attribute 'name' of 'group' (with any number of elements) into 'values', converting it to the HDF5 memory type 'type'.
+Returns false if the attribute does not exist. Reading into a vector of the right size avoids writing past the end of the
+destination when the attribute has more elements than expected (e.g. SWIFT stores 7 particle types and a 3D BoxSize). */
+template <typename T>
+bool readAttribute(Group *group,
+                   std::string const &name,
+                   PredType const &type,
+                   std::vector<T> *values)
+{
+    if ( not doesAttributeExist( group->getId(), name.c_str() ) )
+        return false;
+    Attribute attribute = group->openAttribute( name.c_str() );
+    hssize_t const n = attribute.getSpace().getSimpleExtentNpoints();
+    values->assign( n>0 ? size_t(n) : 1, T(0) );
+    attribute.read( type, &((*values)[0]) );
+    return true;
+}
+
+/*! Reads a single (scalar or first element) double attribute from the first of the given groups where it exists. */
+bool readFirstDoubleAttribute(H5File *file,
+                              std::vector<std::string> const &groupNames,
+                              std::string const &name,
+                              double *value)
+{
+    for (size_t g=0; g<groupNames.size(); ++g)
+    {
+        if ( H5Lexists( file->getId(), groupNames[g].c_str(), H5P_DEFAULT )<=0 ) continue;
+        Group group = file->openGroup( groupNames[g] );
+        std::vector<double> temp;
+        if ( readAttribute( &group, name, PredType::NATIVE_DOUBLE, &temp ) )
+        {
+            *value = temp[0];
+            return true;
+        }
+    }
+    return false;
+}
+
+
 /*! Reads some of the entries for the Gadget header from an HDF5 file.
-NOTE: it does not read all the entries, it only reads the particle number in the file, the mass array, the box length and the number of files per snapshot. 
+Works for the HDF5 snapshots of Gadget-2/3, Gadget-4 and SWIFT. It reads the particle number in the file, the mass array, the box length,
+the number of files per snapshot, the redshift/time and, if available, the cosmological parameters (from the 'Header', 'Parameters'
+(Gadget-4) or 'Cosmology' (SWIFT) groups).
+NOTE: DTFE works with the particle types 0 to 5. Snapshots with more types (SWIFT has 7) are read, but types 6 and higher are ignored.
 */
 void HDF5_readGadgetHeader(std::string filename,
                            Gadget_header *gadgetHeader)
 {
     // the name of the HDF5 file
     const H5std_string FILE_NAME( filename );
-    
+
     // open the HDF5 file and the header group
     H5File *file = new H5File( FILE_NAME, H5F_ACC_RDONLY );
     Group *group = new Group( file->openGroup("/Header") );
-    
-    
-    // start reading one header attribute at a time
-    std::string name( "NumPart_ThisFile" );
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_INT, gadgetHeader->npart );
-    else throwError( "No '" + name + "' attribute found in the HDF5 file '" + filename + "'. Cannot continue with the program!" );
-    
-    name = "MassTable";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, gadgetHeader->mass );
-    else throwError( "No '" + name + "' attribute found in the HDF5 file '" + filename + "'. Cannot continue with the program!" );
-    
-    name = "NumFilesPerSnapshot";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_INT, &(gadgetHeader->num_files) );
-    else throwError( "No '" + name + "' attribute found in the HDF5 file '" + filename + "'. Cannot continue with the program!" );
-    
-    name = "BoxSize";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->BoxSize) );
-    
-    name = "NumPart_Total";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_UINT, gadgetHeader->npartTotal );
-    
-    name = "Redshift";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->redshift) );
-    
-    name = "Time";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->time) );
-    name = "Time_GYR";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->time) );
-    
-    name = "Omega0";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->Omega0) );
-    
-    name = "OmegaLambda";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->OmegaLambda) );
-    
-    name = "HubbleParam";
-    if ( doesAttributeExist( group->getId(), name.c_str() ) )
-        group->openAttribute( name.c_str() ).read( PredType::NATIVE_DOUBLE, &(gadgetHeader->HubbleParam) );
-    
-    
-    // close the group and file
+    std::memset( gadgetHeader, 0, sizeof(*gadgetHeader) );
+
+
+    // particle numbers in this file (required)
+    std::vector<long long> npart;
+    if ( not readAttribute( group, "NumPart_ThisFile", PredType::NATIVE_LLONG, &npart ) )
+        throwError( "No 'NumPart_ThisFile' attribute found in the HDF5 file '" + filename + "'. Cannot continue with the program!" );
+    for (size_t i=0; i<npart.size(); ++i)
+    {
+        if ( i>=6 )
+        {
+            if ( npart[i]!=0 )
+            {
+                MESSAGE::Warning warning( 1 );
+                warning << "The HDF5 file '" << filename << "' has " << npart[i] << " particles of type " << i << ". DTFE can only read the particle types 0 to 5, so these particles will be ignored." << MESSAGE::EndWarning;
+            }
+            continue;
+        }
+        if ( npart[i]>2147483647LL )
+            throwError( "The HDF5 file '" + filename + "' has more than 2^31 particles of one type. Please write the snapshot in several files." );
+        gadgetHeader->npart[i] = int( npart[i] );
+    }
+
+    // mass table (required; a value of 0 means that the masses are stored for each particle)
+    std::vector<double> mass;
+    if ( not readAttribute( group, "MassTable", PredType::NATIVE_DOUBLE, &mass ) )
+        throwError( "No 'MassTable' attribute found in the HDF5 file '" + filename + "'. Cannot continue with the program!" );
+    for (size_t i=0; i<6 and i<mass.size(); ++i)
+        gadgetHeader->mass[i] = mass[i];
+
+    // number of files (required)
+    std::vector<int> numFiles;
+    if ( not readAttribute( group, "NumFilesPerSnapshot", PredType::NATIVE_INT, &numFiles ) )
+        throwError( "No 'NumFilesPerSnapshot' attribute found in the HDF5 file '" + filename + "'. Cannot continue with the program!" );
+    gadgetHeader->num_files = numFiles[0];
+
+    // box size: a single value (Gadget) or one value per axis (SWIFT); the box is assumed to be a cube
+    std::vector<double> boxSize;
+    if ( readAttribute( group, "BoxSize", PredType::NATIVE_DOUBLE, &boxSize ) )
+    {
+        gadgetHeader->BoxSize = boxSize[0];
+        for (size_t i=1; i<boxSize.size(); ++i)
+            if ( std::fabs(boxSize[i]-boxSize[0]) > 1.e-6*std::fabs(boxSize[0]) )
+            {
+                MESSAGE::Warning warning( 1 );
+                warning << "The box in the HDF5 file '" << filename << "' is not a cube. DTFE will use the length along the x-axis (" << boxSize[0] << ") for all the axes; use the '--box' option to give the box coordinates explicitly." << MESSAGE::EndWarning;
+                break;
+            }
+    }
+
+    // total particle numbers (only used for information)
+    std::vector<unsigned long long> npartTotal;
+    if ( readAttribute( group, "NumPart_Total", PredType::NATIVE_ULLONG, &npartTotal ) )
+        for (size_t i=0; i<6 and i<npartTotal.size(); ++i)
+            gadgetHeader->npartTotal[i] = int( npartTotal[i] & 0xffffffffULL );
+
     delete group;
+
+
+    // redshift, time and cosmological parameters (optional)
+    std::vector<std::string> header(1,"/Header");
+    readFirstDoubleAttribute( file, header, "Redshift", &(gadgetHeader->redshift) );
+    if ( not readFirstDoubleAttribute( file, header, "Time", &(gadgetHeader->time) ) )
+        readFirstDoubleAttribute( file, header, "Time_GYR", &(gadgetHeader->time) );
+
+    std::vector<std::string> cosmoGroups;
+    cosmoGroups.push_back( "/Header" );
+    cosmoGroups.push_back( "/Parameters" );     // Gadget-4
+    std::vector<std::string> swiftCosmo(1,"/Cosmology");    // SWIFT
+    if ( not readFirstDoubleAttribute( file, cosmoGroups, "Omega0", &(gadgetHeader->Omega0) ) )
+        readFirstDoubleAttribute( file, swiftCosmo, "Omega_m", &(gadgetHeader->Omega0) );
+    if ( not readFirstDoubleAttribute( file, cosmoGroups, "OmegaLambda", &(gadgetHeader->OmegaLambda) ) )
+        readFirstDoubleAttribute( file, swiftCosmo, "Omega_lambda", &(gadgetHeader->OmegaLambda) );
+    if ( not readFirstDoubleAttribute( file, cosmoGroups, "HubbleParam", &(gadgetHeader->HubbleParam) ) )
+        readFirstDoubleAttribute( file, swiftCosmo, "h", &(gadgetHeader->HubbleParam) );
+
+
+    // close the file
     delete file;
 }
 
@@ -181,7 +252,8 @@ void HDF5_readGadgetData(std::string filename,
                 sprintf( buf, "/PartType%d", type );
                 group = new Group( file->openGroup(buf) );
                 
-                DataSet dataset = group->openDataSet("Mass");
+                // Gadget-4 and SWIFT call this dataset "Masses", Gadget-2/3 call it "Mass"
+                DataSet dataset = group->openDataSet( H5Lexists(group->getId(), "Masses", H5P_DEFAULT)>0 ? "Masses" : "Mass" );
                 
                 dataset.read( &(weights[dataOffset]), PredType::NATIVE_FLOAT );
                 delete group;
@@ -498,7 +570,8 @@ void HDF5_readGadgetData_HI(std::string filename,
                 sprintf( buf, "/PartType%d", type );
                 group = new Group( file->openGroup(buf) );
                 
-                DataSet dataset = group->openDataSet("Mass");
+                // Gadget-4 and SWIFT call this dataset "Masses", Gadget-2/3 call it "Mass"
+                DataSet dataset = group->openDataSet( H5Lexists(group->getId(), "Masses", H5P_DEFAULT)>0 ? "Masses" : "Mass" );
                 
                 dataset.read( &(weights[dataOffset]), PredType::NATIVE_FLOAT );
                 delete group;
