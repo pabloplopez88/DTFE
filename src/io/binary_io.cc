@@ -25,6 +25,21 @@
 /* This file contains functions for reading and writing the data to a binary file. */
 
 
+/* Reads 'n' single precision values from a binary file into 'data', converting them to 'Real' (which is double if the code is compiled with the DOUBLE option). */
+inline void readFloatArray(std::fstream &inputFile, Real *data, size_t const n)
+{
+    if ( sizeof(Real)==sizeof(float) )
+    {
+        inputFile.read( reinterpret_cast<char *>(data), n*sizeof(float) );
+        return;
+    }
+    std::vector<float> temp( n );
+    inputFile.read( reinterpret_cast<char *>(&(temp[0])), n*sizeof(float) );
+    for (size_t i=0; i<n; ++i)
+        data[i] = Real( temp[i] );
+}
+
+
 /* This function reds the input data from a binary file.
 This function works when the binary file has the following format:
     1) file begins with an int value that gives the number of particles
@@ -51,7 +66,7 @@ void readBinaryFile(std::string filename,
     int noParticles;
     float boxCoordinates[2*NO_DIM];
     inputFile.read( reinterpret_cast<char *>(&noParticles), sizeof(noParticles) );
-    inputFile.read( reinterpret_cast<char *>(boxCoordinates), sizeof(float) );
+    inputFile.read( reinterpret_cast<char *>(boxCoordinates), sizeof(boxCoordinates) );    // all the 2*NO_DIM box coordinates
     for (size_t i=0; i<2*NO_DIM; ++i)
         userOptions->boxCoordinates[i] = boxCoordinates[i];
     
@@ -62,15 +77,10 @@ void readBinaryFile(std::string filename,
     Real *velocities = readData->velocity(noParticles); //particle velocities
     
     
-    // read the rest of the input data: positions, weights and velocities
-    size_t dataSize = noParticles * sizeof(float) * NO_DIM;    // number of data bytes that store the particle positions (3*4 bytes per particle)
-    inputFile.read( reinterpret_cast<char *>(positions), dataSize );
-    
-    dataSize = noParticles * sizeof(float);    // number of data bytes that store the particle weights (1*4 bytes per particle)
-    inputFile.read( reinterpret_cast<char *>(positions), dataSize );
-    
-    dataSize = noParticles * sizeof(float) * NO_DIM;    // number of data bytes that store the particle velocities (3*4 bytes per particle)
-    inputFile.read( reinterpret_cast<char *>(positions), dataSize );
+    // read the rest of the input data: positions, weights and velocities (each one into its own array)
+    readFloatArray( inputFile, positions, size_t(noParticles) * NO_DIM );   // positions:  x1, y1, z1, x2, ...
+    readFloatArray( inputFile, weights, size_t(noParticles) );              // weights:    w1, w2, ...
+    readFloatArray( inputFile, velocities, size_t(noParticles) * NO_DIM );  // velocities: vx1, vy1, vz1, vx2, ...
     
     checkFileOperations( inputFile, "read from" );   // check that the data reading was succesful
     inputFile.close();
