@@ -265,8 +265,12 @@ void interpolateGrid_averaged_1(DT &dt,
     
     
     // quasi-random sequence of numbers - using the GSL quasi-number generator
-    Real quasiRandomNumbers[maxNN][NO_DIM];
+    // NOTE: the following arrays are allocated on the heap (and not on the stack as in the original code), since for a large number of
+    // sampling points (option '--samples') they do not fit in the stack of the OpenMP threads (the program crashed with a segmentation fault)
+    std::vector<Real> quasiRandomStorage( maxNN*NO_DIM );
+    Real (*quasiRandomNumbers)[NO_DIM] = reinterpret_cast<Real (*)[NO_DIM]>( &(quasiRandomStorage[0]) );
     quasiRandomSequence( quasiRandomNumbers, maxNN );
+    std::vector<Point> randomPointsStorage( maxNN );   // the quasi-random points inside each Delaunay cell
     
     
     
@@ -344,7 +348,7 @@ void interpolateGrid_averaged_1(DT &dt,
         // get the quasi-random points inside the Delaunay cell
         size_t const tempInt = size_t(NN*cellVolume/gridCellVolume) + 1;
         size_t const noRandomPoints = (cellVolume/gridCellVolume>minRatio) ? (tempInt>maxNN ? maxNN:tempInt) : minNN;// number of random points
-        Point randomPoints[noRandomPoints];
+        Point *randomPoints = &(randomPointsStorage[0]);
         quasiRandomPointsInCell( vertexMatrix, noRandomPoints, quasiRandomNumbers, randomPoints );   // get quasi-random points inside the Delaunay cell
         Real factor = cellVolume / noRandomPoints;  // volume associated with each random sample point
         Vertex_handle base = itC->vertex(0);  // stores the "base" vertex of the Delaunay cell
