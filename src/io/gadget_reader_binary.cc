@@ -156,6 +156,7 @@ void initializeGadget(std::string filename,
         *noParticles += numberTotalParticles[i];
     }
     message << "Reading " << *noParticles << " particle data from the input file. These particles are made from the particle species: " << numberTotalParticles[0] << " + "  << numberTotalParticles[1] << " + "  << numberTotalParticles[2] << " + "  << numberTotalParticles[3] << " + "  << numberTotalParticles[4] << " + "  << numberTotalParticles[5] << " .\n" << MESSAGE::Flush;
+    MemoryEstimate::print( *noParticles, *userOptions );   // estimate of the memory needed by the run
 
 
 

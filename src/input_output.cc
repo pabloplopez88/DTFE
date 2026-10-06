@@ -49,6 +49,7 @@ namespace bfs=boost::filesystem;
 
 // contains the definitions of some classes and fucntions used only for input and output purposes
 #include "io/input_output.h"
+#include "io/memory_estimate.h"   // estimate of the memory needed by the run
 
 // different data format readers and writters
 #include "io/gadget_reader_header.cc" 
@@ -130,6 +131,7 @@ void readInputData(std::vector<Particle_data> *p,
     // Read the data from the input file - see the function 'chooseInputDataReadFunction' that selects the input function used to read in the input data file
     FunctionReadInputData functionReadInputData = chooseInputDataReadFunction( userOptions->inputFileType );
     (*functionReadInputData)( filename, &readData, userOptions );
+    MemoryEstimate::print( readData.noParticles(), *userOptions );   // for the readers that do not print it before reading the data (it is printed only once)
     
     
     // 'userOptions->MpcValue' is the conversion factor from the units in the input data file to Mpc units - do the next computation only if userOptions->MpcValue!=1
