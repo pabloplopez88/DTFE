@@ -57,9 +57,15 @@ struct Field
     bool velocity_std;
     bool scalar;
     bool scalar_gradient;
+    // magnetic field (read from the gas particles of SWIFT HDF5 snapshots); it is interpolated using the 3 components of the 'scalar' data
+    bool magnetic;            // the magnetic field B
+    bool magnetic_gradient;   // dB_i/dx_j
+    bool magnetic_divergence; // div B
+    bool magnetic_curl;       // curl B
     
     Field()
-    { triangulation = false; density = false; velocity = false; velocity_gradient = false; velocity_divergence = false; velocity_shear = false; velocity_vorticity = false; velocity_std = false; scalar = false; scalar_gradient = false; }
+    { triangulation = false; density = false; velocity = false; velocity_gradient = false; velocity_divergence = false; velocity_shear = false; velocity_vorticity = false; velocity_std = false; scalar = false; scalar_gradient = false;
+      magnetic = false; magnetic_gradient = false; magnetic_divergence = false; magnetic_curl = false; }
     
     bool updateChoices(std::string choice,
                        std::string str_triang, std::string str_den, std::string str_vel, std::string str_grad, std::string str_div, std::string str_shear, std::string str_vort, std::string str_velstd, std::string str_scalar, std::string str_scalarGrad)
@@ -78,8 +84,33 @@ struct Field
         return true;
     }
     
+    // the magnetic field options: the field names are 'magnetic', 'magneticGradient', 'magneticDivergence' and 'magneticCurl' followed by 'suffix' ("" or "_a")
+    bool updateMagneticChoices(std::string choice, std::string suffix)
+    {
+        if ( choice.compare("magnetic"+suffix)==0 ) magnetic = true;
+        else if ( choice.compare("magneticGradient"+suffix)==0 ) magnetic_gradient = true;
+        else if ( choice.compare("magneticDivergence"+suffix)==0 ) magnetic_divergence = true;
+        else if ( choice.compare("magneticCurl"+suffix)==0 ) magnetic_curl = true;
+        else return false;
+        return true;
+    }
+    
     bool selected()
-    { return ( density or velocity or velocity_gradient or velocity_divergence or velocity_shear or velocity_vorticity or velocity_std or scalar or scalar_gradient ); }
+    { return ( density or velocity or velocity_gradient or velocity_divergence or velocity_shear or velocity_vorticity or velocity_std or scalar or scalar_gradient or selectedMagnetic() ); }
+    
+    bool selectedMagnetic()
+    { return ( magnetic or magnetic_gradient or magnetic_divergence or magnetic_curl ); }
+    bool selectedMagneticDerivatives()
+    { return ( magnetic_gradient or magnetic_divergence or magnetic_curl ); }
+    void deselectMagnetic()
+    { magnetic = false; magnetic_gradient = false; magnetic_divergence = false; magnetic_curl = false; }
+    // the magnetic field is interpolated as a 3-component scalar field: switch on the scalar computations needed for the magnetic fields
+    void mapMagneticToScalar()
+    {
+        if ( magnetic ) scalar = true;
+        if ( selectedMagneticDerivatives() ) scalar_gradient = true;
+        deselectMagnetic();
+    }
     
     bool selectedVelocityDerivatives()
     { return ( velocity_divergence or velocity_shear or velocity_vorticity ); }

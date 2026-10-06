@@ -64,6 +64,8 @@ struct Quantities
     std::vector<Real>                         velocity_std;         // vector that stores the velocity standard deviation map using the DTFE method
     std::vector< Pvector<Real,noScalarComp> > scalar;               // vector that stores a scalar field interpolated to grid using the DTFE method
     std::vector< Pvector<Real,noScalarGradComp> > scalar_gradient;  // vector that stores the gradient of the scalar field map using the DTFE method
+    std::vector<Real>                         magnetic_divergence;  // divergence of the magnetic field (the magnetic field and its gradient are stored in 'scalar' and 'scalar_gradient')
+    std::vector< Pvector<Real,3> >            magnetic_curl;        // curl of the magnetic field
         
     //Functions - you need to modify the below function if you add aditional members to this class ( - this is the case to be able to use the 'partition' option) 
     void copyFromSubgrid(Quantities const &subgridResults,

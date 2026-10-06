@@ -290,6 +290,27 @@ void HDF5_readGadgetData(std::string filename,
     }
     
     
+    // read the magnetic field of the gas particles (SWIFT 'MagneticFluxDensities'), stored in the first 3 components of the scalar data
+    if ( (userOptions.uField.selectedMagnetic() or userOptions.aField.selectedMagnetic()) and gadgetHeader.npart[0]>0 )
+    {
+        message << "\t reading the gas magnetic field ... " << MESSAGE::Flush;
+        group = new Group( file->openGroup( "/PartType0" ) );
+        if ( H5Lexists( group->getId(), "MagneticFluxDensities", H5P_DEFAULT )<=0 )
+            throwError( "The HDF5 file '" + filename + "' does not have the dataset '/PartType0/MagneticFluxDensities', so the magnetic field cannot be computed." );
+        DataSet dataset = group->openDataSet( "MagneticFluxDensities" );
+        std::vector<float> B( size_t(gadgetHeader.npart[0]) * 3 );
+        dataset.read( &(B[0]), PredType::NATIVE_FLOAT );
+        delete group;
+        
+        float *scalar = readData->scalar();          // returns a pointer to the particle scalar properties array
+        size_t const dataOffset = (*numberParticlesRead);    // the gas particles are the first ones read from this file
+        for (size_t i=0; i<size_t(gadgetHeader.npart[0]); ++i)
+            for (size_t c=0; c<3; ++c)
+                scalar[ (dataOffset+i)*NO_SCALARS + c ] = B[3*i+c];
+        message << "Done\n";
+    }
+    
+    
     int noScalarsRead = 0;
     // read the temperatures
     if ( userOptions.readParticleData[3] and gadgetHeader.npart[0]>0 )
@@ -440,8 +461,21 @@ void HDF5_initializeGadget(std::string filename,
     for (size_t i=3; i<userOptions->readParticleData.size(); ++i)
         if ( userOptions->readParticleData[i] )
             noScalars += 1;
-    if ( noScalars>0 )
-        readData->scalar( *noParticles );  // particle scalar quantity
+    bool const readMagneticField = userOptions->uField.selectedMagnetic() or userOptions->aField.selectedMagnetic();
+    if ( noScalars>0 or readMagneticField )
+        readData->scalar( *noParticles );  // particle scalar quantity (also used to store the magnetic field)
+    
+    // the magnetic field is defined only for the gas particles
+    if ( readMagneticField )
+    {
+        for (int i=1; i<6; ++i)
+            if ( numberTotalParticles[i]>0 )
+                throwError( "The magnetic field can be computed only for the gas particles (type 0), but you also selected particles of type ", i, ". Use only the gas particles, e.g. '--input 105 7 1'." );
+        if ( numberTotalParticles[0]==0 )
+            throwError( "The magnetic field can be computed only for the gas particles (type 0), but there are no gas particles in your selection. Use e.g. '--input 105 7 1'." );
+        if ( noScalars>0 )
+            throwError( "The magnetic field cannot be read together with other scalar quantities (e.g. the gas temperature). Please compute them in different runs." );
+    }
 #endif
     
     

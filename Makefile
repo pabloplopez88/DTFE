@@ -52,7 +52,7 @@ OPTIONS += -DVELOCITY
 # Comment this line if you don't need to interpolate additional fields stored in the scalar variable
 OPTIONS += -DSCALAR 
 # number of components of the scalar variable
-OPTIONS += -DNO_SCALARS=1 
+OPTIONS += -DNO_SCALARS=3 
 
 ############################# Input and output operations default settings ##################################
 #------------------------ set which are the default input and output functions for doing data io

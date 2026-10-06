@@ -132,6 +132,7 @@ void User_options::addOptions(po::options_description &allOptions,
 #endif
 #ifdef SCALAR
                     "  scalar = \tcompute scalar quantities at the sampling point position (use 'scalar_a' to get the averaged field components inside the sampling cell).\n"
+                    "  magnetic = \tcompute the magnetic field of the gas particles (SWIFT HDF5 snapshots, '--input 105'). Also 'magneticGradient' (dB_i/dx_j), 'magneticDivergence' (div B) and 'magneticCurl' (curl B), and the averaged versions 'magnetic_a', 'magneticGradient_a', 'magneticDivergence_a' and 'magneticCurl_a'. Only the gas particles can be used (e.g. '--input 105 7 1'), it requires NO_SCALARS=3 and cannot be combined with the 'scalar' fields.\n"
                     "  scalarGradient = \tcompute the gradient of the scalar quantities at the sampling point position (use 'scalarGradient_a' to get the averaged field gradient inside the sampling cell).\n"
 #endif
             );
@@ -389,6 +390,10 @@ void User_options::printOptions()
     if ( this->uField.velocity_vorticity ) uField += " velocity vorticity,";
     if ( this->uField.scalar ) uField += " scalar,";
     if ( this->uField.scalar_gradient ) uField += " scalar gradient,";
+    if ( this->uField.magnetic ) uField += " magnetic field,";
+    if ( this->uField.magnetic_gradient ) uField += " magnetic field gradient,";
+    if ( this->uField.magnetic_divergence ) uField += " magnetic field divergence,";
+    if ( this->uField.magnetic_curl ) uField += " magnetic field curl,";
     if ( this->uField.triangulation ) uField += " triangulation,";
     if ( not this->uField.selected() and this->NGP ) uField = "none since NGP interpolation";
     else if ( not this->uField.selected() and this->CIC ) uField = "none since CIC interpolation";
@@ -406,6 +411,10 @@ void User_options::printOptions()
     if ( this->aField.velocity_std ) aField += " velocity standard deviation,";
     if ( this->aField.scalar ) aField += " scalar,";
     if ( this->aField.scalar_gradient ) aField += " scalar gradient,";
+    if ( this->aField.magnetic ) aField += " magnetic field,";
+    if ( this->aField.magnetic_gradient ) aField += " magnetic field gradient,";
+    if ( this->aField.magnetic_divergence ) aField += " magnetic field divergence,";
+    if ( this->aField.magnetic_curl ) aField += " magnetic field curl,";
     if ( not this->aField.selected() ) aField = "none";
     
     std::string interpolationMethod = "DTFE";
@@ -654,7 +663,8 @@ void User_options::readOptions(int argc, char *argv[], bool getFileNames, bool s
             std::string field = vm["field"].as< std::vector<std::string> >().at(i);
             bool uFieldOption = this->uField.updateChoices( field, "triangulation", "density", "velocity", "gradient", "divergence", "shear", "vorticity", "", "scalar", "scalarGradient" );
             bool aFieldOption = this->aField.updateChoices( field, "", "density_a", "velocity_a", "gradient_a", "divergence_a", "shear_a", "vorticity_a",  "velocityStd_a", "scalar_a", "scalarGradient_a" );
-            if ( not(uFieldOption or aFieldOption) ) throwError( "Unknown value '" + field + "' for the option '--field'." );
+            bool magneticOption = this->uField.updateMagneticChoices( field, "" ) or this->aField.updateMagneticChoices( field, "_a" );
+            if ( not(uFieldOption or aFieldOption or magneticOption) ) throwError( "Unknown value '" + field + "' for the option '--field'." );
         }
     }
     else
@@ -1045,6 +1055,21 @@ void User_options::updateEntries(size_t const noTotalParticles,
     if ( uField.selectedScalar() or aField.selectedScalar() )
         throwError( "Compiler directive 'SCALAR' not detected. You cannot interpolate the scalar data and/or scalar gradient if the compiler directive 'SCALAR' is not activated." );
 #endif
+    // the magnetic field is interpolated using 3 components of the scalar data
+    if ( uField.selectedMagnetic() or aField.selectedMagnetic() )
+    {
+#ifndef SCALAR
+        throwError( "Compiler directive 'SCALAR' not detected. The magnetic field fields need the 'SCALAR' compiler directive (with NO_SCALARS=3) in the Makefile." );
+#endif
+        if ( NO_DIM!=3 or noScalarComp!=3 )
+            throwError( "The magnetic field fields need a 3D computation (NO_DIM=3) and exactly 3 scalar components (NO_SCALARS=3 in the Makefile)." );
+        if ( uField.selectedScalar() or aField.selectedScalar() )
+            throwError( "The magnetic field fields cannot be combined with the 'scalar' fields since they use the same internal storage. Please compute them in different runs." );
+        if ( not DTFE )
+            throwError( "The magnetic field fields can only be computed with the DTFE interpolation method." );
+        if ( inputFileType!=105 )
+            throwError( "The magnetic field can only be read from HDF5 snapshots (option '--input 105')." );
+    }
 #ifndef TEST_PADDING
     if ( testPaddedBoundaries )
         throwError( "Compiler directive 'TEST_PADDING' not detected. You cannot test the padding efficiency if the compiler directive 'TEST_PADDING' is not activated." );

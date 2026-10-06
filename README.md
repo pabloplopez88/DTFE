@@ -40,6 +40,29 @@ Notes:
 * Tested with CGAL 5.6 and 6.2, Boost 1.83, 1.90 and 1.92, HDF5 1.10 and 2.2, and GCC 13 and 15.
 
 
+## Magnetic fields (SWIFT)
+
+For SWIFT HDF5 snapshots with magnetohydrodynamics, DTFE can interpolate the magnetic field of the gas particles (`/PartType0/MagneticFluxDensities`) in the same run as the density and the velocity fields. Add any of the following to `--field` (or `field = ...` lines in the configuration file):
+
+| Field | Output file | Content |
+|---|---|---|
+| `magnetic` / `magnetic_a` | `.mag` / `.a_mag` | B (3 components per grid cell) |
+| `magneticGradient` / `magneticGradient_a` | `.magGrad` / `.a_magGrad` | dB_c/dx_i, stored as index `c*3+i` (9 components) |
+| `magneticDivergence` / `magneticDivergence_a` | `.magDiv` / `.a_magDiv` | div B |
+| `magneticCurl` / `magneticCurl_a` | `.magCurl` / `.a_magCurl` | curl B = (dBz/dy-dBy/dz, dBx/dz-dBz/dx, dBy/dx-dBx/dy) |
+
+The magnetic field is read automatically when one of these fields is requested. Since it exists only for the gas, select only the gas particles, e.g.
+
+```bash
+./DTFE snap_0010.hdf5 gas --input 105 7 1 --MpcUnit 1 --grid 256 --periodic \
+     --field density_a velocity_a divergence_a vorticity_a magnetic_a magneticDivergence_a magneticCurl_a
+```
+
+(the dark matter fields need a separate run with `--input 105 7 2`). Internally the magnetic field uses the 3 components of the `scalar` data (`NO_SCALARS=3` in the `Makefile`), so it cannot be combined with the `scalar` fields in the same run.
+
+Note on the averaged fields (`*_a`): with the default averaging method (`--method 1`) the averages are computed by Monte Carlo sampling inside the Delaunay cells and have a sampling noise that decreases with `--samples` (default 100). Method 2 (`--method 2`) samples points inside each grid cell: its noise is much smaller (in a test with linear fields and 100 samples the error of the averaged velocity and magnetic field was ~30 times smaller than with method 1) and the derived fields that are constant inside the Delaunay cells, such as the divergence and the curl, come out exact.
+
+
 ## Running the demo
 
 The [demo](demo) directory contains a small Gadget-4 HDF5 snapshot (64<sup>3</sup> dark matter particles in a periodic box of 50 Mpc, positions in Mpc) and a configuration file with all the options needed to compute its density field on a 256<sup>3</sup> grid. From the main directory of the repository run:

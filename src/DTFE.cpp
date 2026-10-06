@@ -61,6 +61,8 @@ void DTFE_parallel(vector<Particle_data> *allParticles,
 void computeDivergenceShearVorticity(Field &fields,
                                      int const verboseLevel,
                                      Quantities *quantities);
+void computeMagneticDivergenceCurl(Field &fields,
+                                   Quantities *q);
 
 
 
@@ -116,6 +118,9 @@ void DTFE(vector<Particle_data> *allParticles,
         tempOptions.aField.velocity_gradient = true;
         tempOptions.aField.deselectVelocityDerivatives();
     }
+    // the magnetic field is interpolated as a 3-component scalar field (its divergence and curl are computed afterwards from the gradient)
+    tempOptions.uField.mapMagneticToScalar();
+    tempOptions.aField.mapMagneticToScalar();
     
     
     
@@ -250,6 +255,10 @@ void DTFE(vector<Particle_data> *allParticles,
     // compute the velocity divergence, shear or vorticity, if any
     computeDivergenceShearVorticity( userOptions.uField, userOptions.verboseLevel, uQuantities );
     computeDivergenceShearVorticity( userOptions.aField, userOptions.verboseLevel, aQuantities );
+    
+    // compute the magnetic field divergence and curl, if any
+    computeMagneticDivergenceCurl( userOptions.uField, uQuantities );
+    computeMagneticDivergenceCurl( userOptions.aField, aQuantities );
     
 }
 
@@ -479,6 +488,45 @@ void computeDivergenceShearVorticity(Field &fields,
 }
 
 
+/* Computes the divergence and the curl of the magnetic field from its gradient. The magnetic field is interpolated as the first 3 components
+of the scalar data, so its gradient is stored in 'scalar_gradient' with the layout grad[c*NO_DIM+i] = dB_c/dx_i. */
+void computeMagneticDivergenceCurl(Field &fields,
+                                   Quantities *q)
+{
+#if NO_DIM==3
+    if ( q->scalar_gradient.empty() or not fields.selectedMagnetic() ) return;
+    
+    if ( fields.magnetic_divergence )   // div B = dBx/dx + dBy/dy + dBz/dz
+    {
+        q->magnetic_divergence.reserve( q->scalar_gradient.size() );
+        for (size_t n=0; n<q->scalar_gradient.size(); ++n)
+        {
+            Pvector<Real,noScalarGradComp> &g = q->scalar_gradient[n];
+            q->magnetic_divergence.push_back( g[0*3+0] + g[1*3+1] + g[2*3+2] );
+        }
+    }
+    
+    if ( fields.magnetic_curl )         // curl B = (dBz/dy - dBy/dz, dBx/dz - dBz/dx, dBy/dx - dBx/dy)
+    {
+        q->magnetic_curl.reserve( q->scalar_gradient.size() );
+        for (size_t n=0; n<q->scalar_gradient.size(); ++n)
+        {
+            Pvector<Real,noScalarGradComp> &g = q->scalar_gradient[n];
+            Pvector<Real,3> curl;
+            curl[0] = g[2*3+1] - g[1*3+2];
+            curl[1] = g[0*3+2] - g[2*3+0];
+            curl[2] = g[1*3+0] - g[0*3+1];
+            q->magnetic_curl.push_back( curl );
+        }
+    }
+    
+    // keep the gradient only if requested
+    if ( not fields.magnetic_gradient and not fields.scalar_gradient )
+        q->scalar_gradient.clear();
+#endif
+}
+
+
 
 
 
@@ -561,6 +609,9 @@ void DTFE(vector<Particle_data> *allParticles,
         tempOptions.aField.velocity_gradient = true;
         tempOptions.aField.deselectVelocityDerivatives();
     }
+    // the magnetic field is interpolated as a 3-component scalar field (its divergence and curl are computed afterwards from the gradient)
+    tempOptions.uField.mapMagneticToScalar();
+    tempOptions.aField.mapMagneticToScalar();
     
     
     
@@ -643,6 +694,10 @@ void DTFE(vector<Particle_data> *allParticles,
     // compute the velocity divergence, shear or vorticity, if any
     computeDivergenceShearVorticity( userOptions.uField, userOptions.verboseLevel, uQuantities );
     computeDivergenceShearVorticity( userOptions.aField, userOptions.verboseLevel, aQuantities );
+    
+    // compute the magnetic field divergence and curl, if any
+    computeMagneticDivergenceCurl( userOptions.uField, uQuantities );
+    computeMagneticDivergenceCurl( userOptions.aField, aQuantities );
     
     
     // if the computation was done only for a given partition, output to the user the grid indices used for that

@@ -270,6 +270,24 @@ void writeOutputData(Quantities &uQuantities,
         output.write( uQuantities.scalar_gradient, userOptions.outputFilename + ".scalarGrad", "scalar gradient", userOptions );
     if ( userOptions.aField.scalar_gradient )
         output.write( aQuantities.scalar_gradient, userOptions.outputFilename + ".a_scalarGrad", "volume averaged scalar gradient", userOptions );
+    
+    // outputs the magnetic field and its derived quantities (the magnetic field is interpolated as the 3 components of the scalar data)
+    if ( userOptions.uField.magnetic )
+        output.write( uQuantities.scalar, userOptions.outputFilename + ".mag", "magnetic field", userOptions );
+    if ( userOptions.aField.magnetic )
+        output.write( aQuantities.scalar, userOptions.outputFilename + ".a_mag", "volume averaged magnetic field", userOptions );
+    if ( userOptions.uField.magnetic_gradient )
+        output.write( uQuantities.scalar_gradient, userOptions.outputFilename + ".magGrad", "magnetic field gradient", userOptions );
+    if ( userOptions.aField.magnetic_gradient )
+        output.write( aQuantities.scalar_gradient, userOptions.outputFilename + ".a_magGrad", "volume averaged magnetic field gradient", userOptions );
+    if ( userOptions.uField.magnetic_divergence )
+        output.write( uQuantities.magnetic_divergence, userOptions.outputFilename + ".magDiv", "magnetic field divergence", userOptions );
+    if ( userOptions.aField.magnetic_divergence )
+        output.write( aQuantities.magnetic_divergence, userOptions.outputFilename + ".a_magDiv", "volume averaged magnetic field divergence", userOptions );
+    if ( userOptions.uField.magnetic_curl )
+        output.write( uQuantities.magnetic_curl, userOptions.outputFilename + ".magCurl", "magnetic field curl", userOptions );
+    if ( userOptions.aField.magnetic_curl )
+        output.write( aQuantities.magnetic_curl, userOptions.outputFilename + ".a_magCurl", "volume averaged magnetic field curl", userOptions );
 }
 
 
