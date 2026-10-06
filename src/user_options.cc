@@ -853,12 +853,18 @@ void User_options::readOptions(int argc, char *argv[], bool getFileNames, bool s
     this->testPaddedBoundaries = false;
 #endif
 #ifndef VELOCITY
-    this->uField.deselectVelocity();
-    this->aField.deselectVelocity();
+    if ( this->uField.selectedVelocity() or this->aField.selectedVelocity() )
+        throwError( "You asked for a velocity field, but the program was compiled without velocity support ('make VELOCITY=no'). Please recompile with 'make VELOCITY=yes' (the default) or remove the velocity fields from '--field'." );
+    if ( this->readParticleData[2] )    // do not read the velocities from the input file (saves memory)
+    {
+        this->readParticleData[2] = false;
+        MESSAGE::Warning warning( verboseLevel );
+        warning << "The program was compiled without velocity support ('make VELOCITY=no'), so the particle velocities will not be read from the input file." << MESSAGE::EndWarning;
+    }
 #endif
 #ifndef SCALAR
-    this->uField.deselectScalar();
-    this->aField.deselectScalar();
+    if ( this->uField.selectedScalar() or this->aField.selectedScalar() or this->uField.selectedMagnetic() or this->aField.selectedMagnetic() )
+        throwError( "You asked for a scalar or magnetic field, but the program was compiled without support for them ('make SCALARS=no'). Please recompile with 'make SCALARS=yes' (the default) or remove those fields from '--field'." );
 #endif
     
     // some special settings only for the TSC or SPH methods

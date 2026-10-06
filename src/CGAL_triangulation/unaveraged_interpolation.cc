@@ -176,7 +176,8 @@ Pvector<Real,noScalarGradComp> scalarGradient(Real sGrad[][noScalarComp])
 
 
 
-/* Function to switch to custom values for the scalar field. */
+/* Function to switch to custom values for the scalar field (used only with the MY_SCALAR option, see 'my_function.h'). */
+#ifdef MY_SCALAR
 template <typename Cell>
 Pvector<Real,noScalarComp> customScalar(Cell &current,
                                         Real posMatrixInverse[][NO_DIM],
@@ -195,6 +196,7 @@ Pvector<Real,noScalarComp> customScalar(Cell &current,
     personalizedFunction( samplePoint, density, densGrad, velocity, velGrad, scalar );
     return scalar;
 }
+#endif
 
 
 

@@ -32,6 +32,7 @@ This produces the `DTFE` executable. The library paths are stored inside the exe
 
 Notes:
 * Compile-time options (number of dimensions, velocity/scalar fields, default input/output formats, etc.) are set at the top of the `Makefile`.
+* Memory: by default each particle uses 44 bytes (velocity + 3 extra components used for the magnetic field). If you do not need them, compile with `make VELOCITY=no SCALARS=no` (20 bytes per particle, e.g. ~310 GB instead of ~690 GB for 2500^3 particles) or `make SCALARS=no` (32 bytes, no magnetic field). The program stops with an error if you ask for a field that was not compiled. Run `make clean` before compiling with different options; to keep several versions, rename the executable after each build (e.g. `make clean; make VELOCITY=no SCALARS=no; mv DTFE DTFE_density`).
 * Support for HDF5 snapshots is enabled automatically when the HDF5 C++ library is found. Use `make USE_HDF5=no` to disable it.
 * To use libraries installed elsewhere instead of conda (e.g. cluster modules), give their location: `make LIB_PREFIX=/path/to/prefix`, or each one separately with `GSL_PATH`, `BOOST_PATH`, `CGAL_PATH`, `MPRF_PATH` (GMP and MPFR) and `HDF5_PATH`. The compiler can be chosen with `make CXX=g++`.
 * The library paths are taken from the conda environment (or from the `make` command line), never from shell variables such as `HDF5_PATH` that some clusters define, and the compiled program uses those libraries even if `LD_LIBRARY_PATH` points to other versions of them.
