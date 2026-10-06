@@ -12,16 +12,18 @@
 # Directory where the libraries are installed (the program adds the '/lib' and '/include' parts automatically).
 # Default: the active conda environment. If you want to use libraries installed somewhere else, set LIB_PREFIX
 # (one directory for all the libraries) or the individual paths below, e.g.:  make BOOST_PATH=/opt/boost
-LIB_PREFIX ?= $(CONDA_PREFIX)
-GSL_PATH   ?= $(LIB_PREFIX)
-BOOST_PATH ?= $(LIB_PREFIX)
-CGAL_PATH  ?= $(LIB_PREFIX)
+# NOTE: these variables are taken only from this file or from the 'make' command line, NOT from environment variables with the
+# same name (e.g. many clusters define HDF5_PATH in the shell, which would silently mix the cluster libraries with the conda ones).
+LIB_PREFIX = $(CONDA_PREFIX)
+GSL_PATH   = $(LIB_PREFIX)
+BOOST_PATH = $(LIB_PREFIX)
+CGAL_PATH  = $(LIB_PREFIX)
 # path to the GMP and MPFR libraries (needed by CGAL)
-MPRF_PATH  ?= $(LIB_PREFIX)
+MPRF_PATH  = $(LIB_PREFIX)
 # path to the HDF5 library (it must include the C++ interface, i.e. 'H5Cpp.h' and 'libhdf5_cpp')
-HDF5_PATH  ?= $(LIB_PREFIX)
+HDF5_PATH  = $(LIB_PREFIX)
 # support for reading HDF5 gadget files: 'auto' (enabled if the HDF5 C++ library is found), 'yes' or 'no'
-USE_HDF5   ?= auto
+USE_HDF5   = auto
 
 # C++ compiler - preferably a version that supports OpenMP. Inside a conda environment with the 'cxx-compiler'
 # package, the variable CXX already points to the conda compiler; otherwise 'g++' is used.
@@ -111,7 +113,9 @@ endif
 
 INCLUDES  = $(foreach dir,$(LIB_DIRS),-I$(dir)/include)
 # '-rpath' stores the library paths in the executable, so it runs without having to set LD_LIBRARY_PATH
-LIBRARIES = $(foreach dir,$(LIB_DIRS),-L$(dir)/lib -Wl,-rpath,$(dir)/lib)
+# '--disable-new-dtags' makes the stored paths take precedence over LD_LIBRARY_PATH, so the program always uses the libraries it
+# was compiled with, even if LD_LIBRARY_PATH points to other versions of them (e.g. cluster modules or libraries in the home directory)
+LIBRARIES = $(foreach dir,$(LIB_DIRS),-L$(dir)/lib -Wl,-rpath,$(dir)/lib) -Wl,--disable-new-dtags
 
 COMPILE_FLAGS = -frounding-math -O3 -fopenmp -DNDEBUG $(OPTIONS)
 DTFE_INC = $(INCLUDES)
