@@ -1,0 +1,123 @@
+From a82c9a7d77999761062803c2bd6de827f6e7379c Mon Sep 17 00:00:00 2001
+From: Pablo Lopez <plopez@unc.edu.ar>
+Date: Tue, 6 Oct 2026 15:17:58 +0000
+Subject: [PATCH] Makefile options VELOCITY and SCALARS to save memory
+
+'make VELOCITY=no SCALARS=no' reduces the memory per particle from 44 to
+20 bytes (e.g. ~310 GB instead of ~690 GB for 2500^3 particles) for runs
+that only need the density; 'make SCALARS=no' gives 32 bytes (no
+magnetic field).
+
+- Fix compilation without SCALAR (bug in the original code): the
+  customScalar() helper is only defined with MY_SCALAR, where it is used.
+- Asking for a velocity, scalar or magnetic field that was not compiled
+  is now an error (before, those fields were silently ignored).
+- Without VELOCITY the velocities are not read from the input file.
+- README: memory options.
+
+Tested: the four combinations compile and give identical densities; the
+default build gives identical results to the previous version.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01C44ZCErHKsQgk681XW3FMn
+---
+ Makefile                                      | 19 +++++++++++++------
+ README.md                                     |  1 +
+ .../unaveraged_interpolation.cc               |  4 +++-
+ src/user_options.cc                           | 14 ++++++++++----
+ 4 files changed, 27 insertions(+), 11 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index c4deea2..f5e095f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -49,12 +49,19 @@ OPTIONS += -DNO_DIM=3
+ 
+ ############################# Quantities to be computed ##################################
+ #------------------------ set which quantities can be computed (can save memory by leaving some out)
+-# Comment this line if you don't need to compute velocity and velocity related components 
+-OPTIONS += -DVELOCITY 
+-# Comment this line if you don't need to interpolate additional fields stored in the scalar variable
+-OPTIONS += -DSCALAR 
+-# number of components of the scalar variable
+-OPTIONS += -DNO_SCALARS=3 
++# These two options can be switched off to save memory (they can also be given on the command line, e.g. 'make VELOCITY=no SCALARS=no'):
++#   VELOCITY = yes : velocity and its derived fields (gradient, divergence, shear, vorticity); 12 bytes per particle
++#   SCALARS  = yes : additional fields stored in the 'scalar' variable with 3 components, used for the magnetic field; 12 bytes per particle
++# Memory per particle: 44 bytes with both (default), 32 bytes with SCALARS=no, 20 bytes with VELOCITY=no SCALARS=no.
++# E.g. for a density map of 2500^3 particles compile with 'make VELOCITY=no SCALARS=no' (~310 GB instead of ~690 GB for the particles).
++VELOCITY = yes
++SCALARS  = yes
++ifeq ($(VELOCITY),yes)
++	OPTIONS += -DVELOCITY
++endif
++ifeq ($(SCALARS),yes)
++	OPTIONS += -DSCALAR -DNO_SCALARS=3
++endif
+ 
+ ############################# Input and output operations default settings ##################################
+ #------------------------ set which are the default input and output functions for doing data io
+diff --git a/README.md b/README.md
+index 0152d7b..ed29007 100644
+--- a/README.md
++++ b/README.md
+@@ -32,6 +32,7 @@ This produces the `DTFE` executable. The library paths are stored inside the exe
+ 
+ Notes:
+ * Compile-time options (number of dimensions, velocity/scalar fields, default input/output formats, etc.) are set at the top of the `Makefile`.
++* Memory: by default each particle uses 44 bytes (velocity + 3 extra components used for the magnetic field). If you do not need them, compile with `make VELOCITY=no SCALARS=no` (20 bytes per particle, e.g. ~310 GB instead of ~690 GB for 2500^3 particles) or `make SCALARS=no` (32 bytes, no magnetic field). The program stops with an error if you ask for a field that was not compiled. Run `make clean` before compiling with different options; to keep several versions, rename the executable after each build (e.g. `make clean; make VELOCITY=no SCALARS=no; mv DTFE DTFE_density`).
+ * Support for HDF5 snapshots is enabled automatically when the HDF5 C++ library is found. Use `make USE_HDF5=no` to disable it.
+ * To use libraries installed elsewhere instead of conda (e.g. cluster modules), give their location: `make LIB_PREFIX=/path/to/prefix`, or each one separately with `GSL_PATH`, `BOOST_PATH`, `CGAL_PATH`, `MPRF_PATH` (GMP and MPFR) and `HDF5_PATH`. The compiler can be chosen with `make CXX=g++`.
+ * The library paths are taken from the conda environment (or from the `make` command line), never from shell variables such as `HDF5_PATH` that some clusters define, and the compiled program uses those libraries even if `LD_LIBRARY_PATH` points to other versions of them.
+diff --git a/src/CGAL_triangulation/unaveraged_interpolation.cc b/src/CGAL_triangulation/unaveraged_interpolation.cc
+index 6b1ca67..eff4517 100644
+--- a/src/CGAL_triangulation/unaveraged_interpolation.cc
++++ b/src/CGAL_triangulation/unaveraged_interpolation.cc
+@@ -176,7 +176,8 @@ Pvector<Real,noScalarGradComp> scalarGradient(Real sGrad[][noScalarComp])
+ 
+ 
+ 
+-/* Function to switch to custom values for the scalar field. */
++/* Function to switch to custom values for the scalar field (used only with the MY_SCALAR option, see 'my_function.h'). */
++#ifdef MY_SCALAR
+ template <typename Cell>
+ Pvector<Real,noScalarComp> customScalar(Cell &current,
+                                         Real posMatrixInverse[][NO_DIM],
+@@ -195,6 +196,7 @@ Pvector<Real,noScalarComp> customScalar(Cell &current,
+     personalizedFunction( samplePoint, density, densGrad, velocity, velGrad, scalar );
+     return scalar;
+ }
++#endif
+ 
+ 
+ 
+diff --git a/src/user_options.cc b/src/user_options.cc
+index 4b700e7..f652687 100644
+--- a/src/user_options.cc
++++ b/src/user_options.cc
+@@ -853,12 +853,18 @@ void User_options::readOptions(int argc, char *argv[], bool getFileNames, bool s
+     this->testPaddedBoundaries = false;
+ #endif
+ #ifndef VELOCITY
+-    this->uField.deselectVelocity();
+-    this->aField.deselectVelocity();
++    if ( this->uField.selectedVelocity() or this->aField.selectedVelocity() )
++        throwError( "You asked for a velocity field, but the program was compiled without velocity support ('make VELOCITY=no'). Please recompile with 'make VELOCITY=yes' (the default) or remove the velocity fields from '--field'." );
++    if ( this->readParticleData[2] )    // do not read the velocities from the input file (saves memory)
++    {
++        this->readParticleData[2] = false;
++        MESSAGE::Warning warning( verboseLevel );
++        warning << "The program was compiled without velocity support ('make VELOCITY=no'), so the particle velocities will not be read from the input file." << MESSAGE::EndWarning;
++    }
+ #endif
+ #ifndef SCALAR
+-    this->uField.deselectScalar();
+-    this->aField.deselectScalar();
++    if ( this->uField.selectedScalar() or this->aField.selectedScalar() or this->uField.selectedMagnetic() or this->aField.selectedMagnetic() )
++        throwError( "You asked for a scalar or magnetic field, but the program was compiled without support for them ('make SCALARS=no'). Please recompile with 'make SCALARS=yes' (the default) or remove those fields from '--field'." );
+ #endif
+     
+     // some special settings only for the TSC or SPH methods
+-- 
+2.43.0
+
