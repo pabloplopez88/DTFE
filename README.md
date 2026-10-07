@@ -28,24 +28,44 @@ conda activate dtfe
 make
 ```
 
-This produces the `DTFE` executable. The library paths are stored inside the executable, so it runs without setting `LD_LIBRARY_PATH` (you do not even need to activate the conda environment to run it, e.g. inside a SLURM job).
+This produces the `DTFE` executable, which by default computes **only the density** (the most common use, and the one that needs the least memory). The library paths are stored inside the executable, so it runs without setting `LD_LIBRARY_PATH` (you do not even need to activate the conda environment to run it, e.g. inside a SLURM job).
+
+### Versions with velocity and magnetic fields
+
+The velocity fields and the magnetic field are compile-time options, since they increase the memory used per particle:
+
+| Executable | Compile with | Fields | Memory per particle |
+|---|---|---|---|
+| `DTFE` | `make` (= `make VELOCITY=no SCALARS=no`) | density | 20 bytes |
+| `DTFE_vel` | `make VELOCITY=yes SCALARS=no` | + velocity, gradient, divergence, shear, vorticity | 32 bytes |
+| `DTFE_mag` | `make VELOCITY=yes SCALARS=yes` | + magnetic field and its derivatives (and the `scalar` fields) | 44 bytes |
+
+To build the three of them (with the `dtfe` environment active):
+
+```bash
+make clean && make VELOCITY=yes SCALARS=yes && mv DTFE DTFE_mag && \
+make clean && make VELOCITY=yes SCALARS=no  && mv DTFE DTFE_vel && \
+make clean && make && ls -la DTFE DTFE_vel DTFE_mag
+```
+
+(`make clean` deletes the `DTFE` executable, so the density-only version is built last). If you ask for a field that was not compiled, the program stops with an error that tells you which version to use. For example, for 2500<sup>3</sup> particles the particle data alone takes ~310 GB with `DTFE` and ~690 GB with `DTFE_mag`.
 
 Notes:
 * Compile-time options (number of dimensions, velocity/scalar fields, default input/output formats, etc.) are set at the top of the `Makefile`.
 * Before reading the particle data, DTFE prints an estimate of the memory (RAM) the run will need (in GB). It is an empirical model calibrated with test runs (typically within 20%) that accounts for the number of particles, the compiled fields, the grid and fields requested, `--partition` and the number of threads (`OMP_NUM_THREADS`). For very large snapshots the peak is often the reading of the data, when the arrays read from the file and the particle data coexist.
-* Memory: by default each particle uses 44 bytes (velocity + 3 extra components used for the magnetic field). If you do not need them, compile with `make VELOCITY=no SCALARS=no` (20 bytes per particle, e.g. ~310 GB instead of ~690 GB for 2500^3 particles) or `make SCALARS=no` (32 bytes, no magnetic field). The program stops with an error if you ask for a field that was not compiled. Run `make clean` before compiling with different options; to keep several versions, rename the executable after each build (e.g. `make clean; make VELOCITY=no SCALARS=no; mv DTFE DTFE_density`).
+* Run `make clean` before compiling with different `VELOCITY` / `SCALARS` options (see the table above).
 * Support for HDF5 snapshots is enabled automatically when the HDF5 C++ library is found. Use `make USE_HDF5=no` to disable it.
 * To use libraries installed elsewhere instead of conda (e.g. cluster modules), give their location: `make LIB_PREFIX=/path/to/prefix`, or each one separately with `GSL_PATH`, `BOOST_PATH`, `CGAL_PATH`, `MPRF_PATH` (GMP and MPFR) and `HDF5_PATH`. The compiler can be chosen with `make CXX=g++`.
 * The library paths are taken from the conda environment (or from the `make` command line), never from shell variables such as `HDF5_PATH` that some clusters define, and the compiled program uses those libraries even if `LD_LIBRARY_PATH` points to other versions of them.
 * On clusters, do not mix cluster modules with the conda environment: run `module purge` before `conda activate dtfe` and `make` (a loaded `gcc` module can make the conda compiler fail with `cannot execute 'cc1plus'`). Also use `module purge` in SLURM job scripts before running `DTFE`.
-* Input formats (`--input`): `101` reads Gadget binary snapshots (formats 1 and 2) with either the Gadget-1/2 header or the Gadget-4 header (the default of Gadget-4 when compiled without `GADGET2_HEADER`): the program tries the Gadget-2 header first, then the Gadget-4 one, and stops with an error only if none matches. Positions and velocities can be in single or double precision, and files with the opposite endianness are also supported. `105` reads HDF5 snapshots from Gadget-2/3, Gadget-4 and SWIFT (SWIFT lengths are in Mpc without h, so use `--MpcUnit 1`; particle types 6 and higher are ignored). For snapshots split in several files put `%i` in the file name where the file number goes (e.g. `snapshot_%i.bin` or `snap_0010.%i.hdf5`); a SWIFT "virtual" snapshot file can also be given directly. The second value of `--input` selects the data to read (1 = positions, 2 = masses, 4 = velocities; e.g. `--input 105 7`) and the third one the particle types (1 = type 0, 2 = type 1, 4 = type 2, ...; e.g. `--input 105 7 3` for gas + dark matter).
+* Input formats (`--input`): `101` reads Gadget binary snapshots (formats 1 and 2) with either the Gadget-1/2 header or the Gadget-4 header (the default of Gadget-4 when compiled without `GADGET2_HEADER`): the program tries the Gadget-2 header first, then the Gadget-4 one, and stops with an error only if none matches. Positions and velocities can be in single or double precision, and files with the opposite endianness are also supported. `105` reads HDF5 snapshots from Gadget-2/3, Gadget-4 and SWIFT (SWIFT lengths are in Mpc without h, so use `--MpcUnit 1`; particle types 6 and higher are ignored). Note that Gadget (2, 3 and 4) stores the velocities as u = v/sqrt(a) and DTFE uses them as they are, so for snapshots at z>0 multiply the velocity fields by sqrt(a) to get peculiar velocities. For snapshots split in several files put `%i` in the file name where the file number goes (e.g. `snapshot_%i.bin` or `snap_0010.%i.hdf5`); a SWIFT "virtual" snapshot file can also be given directly. The second value of `--input` selects the data to read (1 = positions, 2 = masses, 4 = velocities; e.g. `--input 105 7`) and the third one the particle types (1 = type 0, 2 = type 1, 4 = type 2, ...; e.g. `--input 105 7 3` for gas + dark matter).
 * Bug fix with respect to the original DTFE code: the interpolation of the velocity (and of the scalar fields) to the grid points used only one of the three terms of the linear interpolation (`=` instead of `+=` in `velocityValue` and `scalarValue`), so the `velocity` / `velocity_a` fields (`.vel`, `.a_vel` files) were wrong and depended on the order of the particles. The velocity gradient and the fields derived from it (divergence, shear, vorticity) and the density were not affected.
-* Tested with CGAL 5.6 and 6.2, Boost 1.83, 1.90 and 1.92, HDF5 1.10 and 2.2, and GCC 13 and 15.
+* Tested with CGAL 5.6 and 6.2, Boost 1.83, 1.90 and 1.92, HDF5 1.10 and 2.2, and GCC 13 and 15, and with real Gadget-4 (HDF5, and binary in several files) and SWIFT (HDF5, with magnetic fields) snapshots.
 
 
 ## Magnetic fields (SWIFT)
 
-For SWIFT HDF5 snapshots with magnetohydrodynamics, DTFE can interpolate the magnetic field of the gas particles (`/PartType0/MagneticFluxDensities`) in the same run as the density and the velocity fields. Add any of the following to `--field` (or `field = ...` lines in the configuration file):
+For SWIFT HDF5 snapshots with magnetohydrodynamics, the `DTFE_mag` version (`make VELOCITY=yes SCALARS=yes`, see above) can interpolate the magnetic field of the gas particles (`/PartType0/MagneticFluxDensities`) in the same run as the density and the velocity fields. Add any of the following to `--field` (or `field = ...` lines in the configuration file):
 
 | Field | Output file | Content |
 |---|---|---|
@@ -57,11 +77,11 @@ For SWIFT HDF5 snapshots with magnetohydrodynamics, DTFE can interpolate the mag
 The magnetic field is read automatically when one of these fields is requested. Since it exists only for the gas, select only the gas particles, e.g.
 
 ```bash
-./DTFE snap_0010.hdf5 gas --input 105 7 1 --MpcUnit 1 --grid 256 --periodic \
+./DTFE_mag snap_0010.hdf5 gas --input 105 7 1 --MpcUnit 1 --grid 256 --periodic \
      --field density_a velocity_a divergence_a vorticity_a magnetic_a magneticDivergence_a magneticCurl_a
 ```
 
-(the dark matter fields need a separate run with `--input 105 7 2`). Internally the magnetic field uses the 3 components of the `scalar` data (`NO_SCALARS=3` in the `Makefile`), so it cannot be combined with the `scalar` fields in the same run.
+(the dark matter fields need a separate run with `--input 105 7 2`, which can use `DTFE_vel`). Internally the magnetic field uses the 3 components of the `scalar` data (`NO_SCALARS=3` in the `Makefile`), so it cannot be combined with the `scalar` fields in the same run.
 
 Note on the averaged fields (`*_a`): with the default averaging method (`--method 1`) the averages are computed by Monte Carlo sampling inside the Delaunay cells and have a sampling noise that decreases with `--samples` (default 100). Method 2 (`--method 2`) samples points inside each grid cell: its noise is much smaller (in a test with linear fields and 100 samples the error of the averaged velocity and magnetic field was ~30 times smaller than with method 1) and the derived fields that are constant inside the Delaunay cells, such as the divergence and the curl, come out exact.
 
@@ -82,6 +102,8 @@ n = 256
 rho = np.fromfile('demo/demo_output.den', dtype=np.float32).reshape(n, n, n)
 delta = rho / rho.mean()      # density in units of the mean density
 ```
+
+The density written by DTFE is already dimensionless: it is rho/rho_mean, where rho_mean = (total mass of the particles read) / (box volume) is the value printed as "Average density in the box" (in the mass units of the snapshot per Mpc<sup>3</sup>; multiply the map by it to get physical units). Without reading the masses (`--input 105 1`) all particles have weight 1, so it is the number density over its mean.
 
 To make a quick figure of the result (a slab through the middle of the box and a projection along the full box), run, with the `dtfe` environment active (it includes `numpy` and `matplotlib`):
 
