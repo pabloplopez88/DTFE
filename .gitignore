@@ -65,3 +65,7 @@ DTFE_include/
 # output of the demo run
 demo/demo_output*
 demo/demo_density.png
+
+# executables built with different options
+/DTFE_vel
+/DTFE_mag

@@ -54,8 +54,8 @@ OPTIONS += -DNO_DIM=3
 #   SCALARS  = yes : additional fields stored in the 'scalar' variable with 3 components, used for the magnetic field; 12 bytes per particle
 # Memory per particle: 44 bytes with both (default), 32 bytes with SCALARS=no, 20 bytes with VELOCITY=no SCALARS=no.
 # E.g. for a density map of 2500^3 particles compile with 'make VELOCITY=no SCALARS=no' (~310 GB instead of ~690 GB for the particles).
-VELOCITY = yes
-SCALARS  = yes
+VELOCITY = no
+SCALARS  = no
 ifeq ($(VELOCITY),yes)
 	OPTIONS += -DVELOCITY
 endif
