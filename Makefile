@@ -1,4 +1,5 @@
 # Makefile for compiling the DTFE code on Linux systems
+# Modified in 2026 by Pablo Lopez (https://github.com/pabloplopez88/DTFE); see the git history for the changes.
 #
 # QUICK START (any cluster/computer, see README.md):
 #     conda env create -f environment.yml    # only the first time

@@ -5,6 +5,8 @@
  *                           University of Groningen, the Netherlands
  *
  *
+ *  Modified in 2026 by Pablo Lopez (https://github.com/pabloplopez88/DTFE); see the git history for the changes.
+ *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or

@@ -1,4 +1,8 @@
 
+> **This is a modified version of the [DTFE public software](https://github.com/MariusCautun/DTFE) by Marius Cautun**, maintained by Pablo López (2026). It adds readers for SWIFT and Gadget-4 snapshots, the interpolation of magnetic fields, an estimate of the memory needed by each run and a simpler compilation, and it fixes some bugs (see the sections below and the git history). It is not the official version: please report problems with it in [this repository](https://github.com/pabloplopez88/DTFE/issues). It is distributed under the same license as the original code (GNU GPL v3, see [LICENSE.md](LICENSE.md)).
+>
+> If you use this code, please cite [Cautun & van de Weygaert (2011)](https://ui.adsabs.harvard.edu/abs/2011arXiv1105.0370C/abstract) and [Schaap & van de Weygaert (2000)](https://ui.adsabs.harvard.edu/abs/2000A%26A...363L..29S/abstract).
+
 # The DTFE public software
 
 The DTFE public code is a C++ implementation of the **Delaunay Tessellation Field Interpolation (DTFE)** method. Its purpose is to interpolate quantities stored at the location of an unstructured set of points to a regular grid using the maximum of information contained in the input points set. In particular, the code can calculate the following cosmological quantities:
